@@ -26,7 +26,7 @@ Converting words to features
 
 Some packages that might be useful:
 	Word Embeddings - https://github.com/bmschmidt/wordVectors
-	NLP (tokenization, vectorization) - OpenNLP, text2vec
+	NLP (tokenization, vectorization) - OpenNLP, text2vec(https://cran.r-project.org/web/packages/text2vec/vignettes/text-vectorization.html#text_analysis_pipeline)
 
 Reading:
 	https://monkeylearn.com/blog/beginners-guide-text-vectorization/
