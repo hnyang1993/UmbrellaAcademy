@@ -1,0 +1,43 @@
+Converting words to features
+	- tokenize the data (split each message into words)
+	- need to "featurize" the data by coming up with a set of features (also called vectorization)
+		- count vectorization: 
+			- Find the vocabulary of n words, which is all words that appear in at least one message in the data
+			- For each message, you get a vector of length n, where for each word in the vocabulary, the value is the number of times that word appeared in the message
+			e.g.
+			vocab = ["I","love","cat","dog","my","dad", "don't"]
+			
+			Message				Features
+							I	| love	| cat	| dog	| my	| dad	| don't	| and
+			I don't love my dog		1	  1	  0	  1	  1	  0	  1	  0
+			I love my cat and my dog	1	  0	  1	  1	  2	  0	  0	  1
+			I love my dad			1	  1	  0	  0	  1	  1	  0	  0
+
+		- tfidf vectorization [https://en.wikipedia.org/wiki/Tf%E2%80%93idf]:
+			- word count * log(# of messages / # of messages containing the word)
+
+							I	| love		| cat	| dog		| my		| dad	| don't		| and
+			I don't love my dog		log(1)	  log(1.5)	  0	  log(1.5)	  log(1)  	  0	  log(3)	  0
+			I love my cat and my dog	log(1)	  0	  	  log(1)  log(1.5)	  2*log(1)	  0	  0	    	  log(3)
+			I love my dad			log(1)	  log(1.5)	  0	  0	  	  log(1)	  log(3)  0	  	  0
+
+		- Word embedding [https://en.wikipedia.org/wiki/Word_embedding]:
+			- using a two-layer neural network, discover n-dimensional vector representations of all words in the vocabulary. The closer two vectors in space, the more semantically similar the words
+
+Some packages that might be useful:
+	Word Embeddings - https://github.com/bmschmidt/wordVectors
+	NLP (tokenization, vectorization) - OpenNLP, text2vec
+
+Reading:
+	https://monkeylearn.com/blog/beginners-guide-text-vectorization/
+	https://cran.r-project.org/web/packages/text2vec/vignettes/text-vectorization.html
+
+Keyword Extraction:
+By keywords, I assume you mean identifying the words which are most informative for identifying toxic vs. non-toxic. While one might think to look at the words only in toxic documents, this is not enough. The most frequent words would be those which carry very little semantic weight (grammatical function words). You need to look at toxic vs non-toxic and identify the words whose distributions differ the most between toxic and non-toxic docs. This is basically feature selection (two articles on it in the context of NLP: https://nlp.stanford.edu/IR-book/html/htmledition/feature-selection-1.html, https://nlp.stanford.edu/IR-book/html/htmledition/feature-selectionchi2-feature-selection-1.html). I've used chi2 selection in python, and it really seems to help.
+
+A couple models that seem really popular for this kind of classifaction:
+Passive Aggressive Classifiers
+Random Forests
+Lasso
+Long-short-term-memory neural networks
+
