@@ -12,6 +12,8 @@ obscene = train[which(train$obscene==1),]
 threat = train[which(train$threat==1),]
 insult = train[which(train$insult==1),]
 identity_hate = train[which(train$identity_hate==1),]
+
+tok_fun = word_tokenizer
 getvocab = function(train){
   setDT(train)
   setkey(train, id)
@@ -23,7 +25,8 @@ getvocab = function(train){
                     ids = train$id,
                     progressbar = FALSE)
   stop_words = c("i", "me", "my", "myself", "we", "our", "ours", "ourselves", 
-                 "you", "your", "yours", "the", "in", "on", "a")
+                 "you", "your", "yours", "the", "in", "on", "a", "an", "but", "or", "was", "if", "with", "are", "have", "as", 
+                 "be", "not", "this", "for", "it", "that", "is", "and", "of", "to" )
   vocab = create_vocabulary(it_train, stopwords = stop_words)
   # delete non-English terms   
   vocab = vocab[grep("[a-z]", vocab$term),]
