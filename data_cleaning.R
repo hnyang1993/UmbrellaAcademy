@@ -12,7 +12,7 @@ obscene = train[which(train$obscene==1),]
 threat = train[which(train$threat==1),]
 insult = train[which(train$insult==1),]
 identity_hate = train[which(train$identity_hate==1),]
-
+prep_fun = tolower
 tok_fun = word_tokenizer
 getvocab = function(train){
   setDT(train)
