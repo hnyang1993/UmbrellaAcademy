@@ -1,0 +1,8 @@
+handling imbalanced datasets
+
+https://www.kaggle.com/rafjaa/resampling-strategies-for-imbalanced-datasets
+
+https://www.analyticsvidhya.com/blog/2017/03/imbalanced-classification-problem/
+
+https://www.marcoaltini.com/blog/dealing-with-imbalanced-data-undersampling-oversampling-and-proper-cross-validation
+
