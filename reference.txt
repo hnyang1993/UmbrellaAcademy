@@ -1,0 +1,3 @@
+https://www.kaggle.com/kailex/tidy-xgboost-glmnet-text2vec-lsa
+
+https://www.kaggle.com/nonserial/regex-text2vec-tfidf-lsa-lda-lightgbm
