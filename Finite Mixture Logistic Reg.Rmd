@@ -1,0 +1,145 @@
+---
+title: "Finite Mixture Logistic Regression"
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+header_includes:
+- \usepackage{amsmath}
+- \usepackage{amssymb}
+- \usepackage{amsthm}
+include-before:
+- '\newcommand{\bfm}[1]{\ensuremath{\mathbf{#1}}}'
+- '\newcommand{\bdm}[1]{\ensuremath{\boldsymbol{#1}}}'
+- '$\def \d \bfm{d}$'
+- '$\def \e \bfm{e}$'
+- '$\def \g \bfm{g}$'
+- '$\def \I \bfm{I}$'
+- '$\def \l \bfm{l}$'
+- '$\def \M \bfm{M}$'
+- '$\def \W \bfm{W}$'
+- '$\def \y \bfm{y}$'
+- '$\def \Y \bfm{Y}$'
+- '$\def \x \bfm{x}$'
+- '$\def \X \bfm{X}$'
+- '$\def \z \bfm{z}$'
+- '$\def \thetab \boldsymbol{\theta}$'
+- '$\def \betab \boldsymbol{\beta}$'
+- '$\def \pib \boldsymbol{\pi}$'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data and Model
+Define $y_i = I(a \; word \; in \; the \; vocabulary \; appears \; in \; the \; i_{th} \; comment)$, $\gamma_i = length \; of \; the \; i_{th} \; comment$, $z_i = I(the \; i_{th} \; comment \; is \; toxic)$. Then given the comment data (after tokenization and basic preprocessing) only, $y_i$ and $\gamma_i$ are observed for each subject $i$ while $z_i$'s are unobserved. For each group $k=0,1$ (1 indicating that the comment is toxic), model the occurence of a word within a comment from one of the groups by a logistic regression model with offset $$logit({p_k}(y_i = 1|\gamma_i)) = \theta_k + \gamma_i,$$ let $\pi_k$ be the prior probability that the comment should fall into group $k$.
+
+## (Observed Data) Log Likelihood
+$$l(\boldsymbol{\theta}) = \sum_{i=1}^n \log\left( \sum_{k =0}^1 \pi_kp_k(y_i|\gamma_{i}, {\theta}_k)\right),$$ where $p_k(y_i|\gamma_{i}, {\theta}_k) =  {p_k}(y_i = 1|\gamma_i)^{y_i} {p_k}(y_i = 0|\gamma_i)^{1-y_i}$,  $logit({p_k}(y_i = 1|\gamma_i)) = \theta_k + \gamma_i$  and  $\sum_{k = 0}^1 \pi_k = 1$.
+
+## Complete Data Log Likelihood
+\begin{align}
+l_c(\boldsymbol{\theta}) &= \sum_{i=1}^n \log( \prod_{k =0}^1 \left[\pi_kp_k(y_i|\gamma_i, {\theta}_k)\right]^{I[z_i = k]}) \\
+&= \sum_{i=1}^n \sum_{k =0}^1 I[z_i = k]\left[\log(\pi_k)+\log(p_k(y_i|\gamma_i, {\theta}_k))\right]\\
+\end{align}
+
+# EM Algorithm
+## E-step
+Need to evaluate $Q(\boldsymbol{\theta}|\boldsymbol{\theta}^{(t)}) = E\left[ \log l_c(\boldsymbol{\theta}) | \boldsymbol{y}_o,\boldsymbol{\theta}^{(t)}\right]$, which can be simplified as the following:
+
+\begin{align}
+Q(\boldsymbol{\theta}|\boldsymbol{\theta}^{(t)}) &=\sum_{i=1}^n \sum_{k =0}^1 E[I[z_i = k] | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)}]\left[\log(\pi_k)+\log(p_k(y_i|\gamma_i, {\theta}_k))\right]\\
+&= \sum_{i=1}^n \sum_{k =0}^1 p(z_i = k | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)})\left[\log(\pi_k)+\log(p_k(y_i|\gamma_i, {\theta}_k))\right]
+\end{align}
+
+where
+
+\begin{align}
+p(z_i = k | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)})
+&= \frac{\pi_k^{(t)}p_k(y_i|\gamma_i, {\theta}^{(t)}_k)}{ \sum_{k =0}^1\pi_k^{(t)}p_k(y_i|\gamma_i, {\theta}^{(t)}_k))}
+\end{align}
+
+## M-step
+The Q function can be separated as weighted log likelihoods with prior weights being the posterior probabilities of group membership given the current updated value of parameters. The $\theta$'s can be updated by weighted logistic regression with offset while the $\pi$'s can be updated simply by taking the average of posterior probabilities for being in each group.
+
+## Implememtation
+```{r eval=FALSE}
+library(Matrix)
+library(data.table)
+train_mar <- readMM("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/jigsaw-toxic-comment-classification-challenge/train_mar.txt")
+train_mar <- as.matrix(train_mar)
+train_mar_id <- read.csv("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/jigsaw-toxic-comment-classification-challenge/train_mar_id.csv", stringsAsFactors=FALSE)
+train_mar <- cbind(train_mar_id[,2], train_mar)
+train_mar <- train_mar[order(train_mar[,1]),]
+train_mar <- train_mar[,-1]
+train_mar <- apply(train_mar,2,as.numeric)
+train_mar[which(train_mar > 0)] <- 1 ##30588 by 277 matrix
+
+train <- fread("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/jigsaw-toxic-comment-classification-challenge/train.csv")
+train_sub <- train[which(unlist(train$id) %in% train_mar_id[,2]),]
+train_sub <- train_sub[order(train_sub$id),]
+gamma <- nchar(train_sub$comment_text) ##30588 length vector
+
+y <- train_mar[,1]
+n <- nrow(train_mar)
+
+##Need input n, y (vector), gamma (vector), and some values for parameters (in computation)
+
+tol = 10^-5
+maxit = 50
+iter = 0
+eps = Inf
+ll = -10000
+fit = list()
+  
+## create posterior probability matrix
+pp = matrix(0, n, 2)
+colnames(pp) = c("non-toxic","toxic")
+
+## use informative initialization, 
+## should vary this and re-evaluate
+prop_toxic = 0.5
+
+## set everything greater than th
+pp[y > quantile(y, prop_toxic),2] = 1
+pp[,1] = 1 - pp[,2]
+
+## now start the EM algorithm
+start = Sys.time()
+while(eps > tol & iter < maxit){
+  
+  ## save old ll
+    ll0 = ll
+  
+  ## start M-step
+    # pi, mean of component pp's
+    pi = colMeans(pp)
+    
+    # thetak, weighted glm's based on pp
+    for(i in 1:2) fit[[i]] = glm(y ~ 1, family = binomial(), offset = gamma, weights = pp[,i])
+  
+  ## start E-step
+    # calculate numerator
+    for(i in 1:2) pp[,i] = pi[i]*dbinom(y, size = 1, prob = fit[[i]]$fitted)
+  
+    # divide by denominator, the sum across components in each i
+    pp = pp/rowSums(pp)
+ 
+  ## calculate LL
+    interior_sum = 0
+    for(i in 1:2) interior_sum = interior_sum + pi[i]*dbinom(y, size = 1, prob = fit[[i]]$fitted) 
+    ll = sum(log(interior_sum))
+    
+  ## calculate relative change in log likelihood  
+    eps  = abs(ll-ll0)/abs(ll0)
+  
+  ## update iterator
+    iter = iter + 1
+    if(iter == maxit) warning("Iteration limit reached without convergence")
+  
+  ## print out info to keep track
+    cat(sprintf("Iter: %d logL: %.2f pi1: %.3f  eps:%f\n",iter, ll,pi[1],eps))
+}
+```
