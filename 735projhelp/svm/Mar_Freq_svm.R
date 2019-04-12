@@ -9,6 +9,8 @@ library(Matrix)
 library(data.table)
 train_mar <- readMM("/nas/longleaf/home/hnyang/735proj/svm/train_mar.txt")
 train_mar <- as.matrix(train_mar)
+keyword <- read.csv("/nas/longleaf/home/hnyang/735proj/svm/key_word_list.csv", stringsAsFactors = FALSE)
+colnames(train_mar) <- keyword[,2]
 train_mar_id <- read.csv("/nas/longleaf/home/hnyang/735proj/svm/train_mar_id.csv", stringsAsFactors=FALSE)
 train_mar_y <- read.csv("/nas/longleaf/home/hnyang/735proj/svm/train_mar_label.csv", stringsAsFactors=FALSE)
 
