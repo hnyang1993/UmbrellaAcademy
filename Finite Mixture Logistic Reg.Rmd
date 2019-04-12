@@ -80,9 +80,13 @@ train_mar[which(train_mar > 0)] <- 1 ##30588 by 277 matrix
 train <- fread("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/jigsaw-toxic-comment-classification-challenge/train.csv")
 train_sub <- train[which(unlist(train$id) %in% train_mar_id[,2]),]
 train_sub <- train_sub[order(train_sub$id),]
-gamma <- nchar(train_sub$comment_text) ##30588 length vector
 
-y <- train_mar[,1]
+l <- sapply(train_sub$comment_text, strsplit, " ")
+gamma <- unlist(lapply(l,length)) ##30588 length vector
+gamma <- unname(gamma)
+#gamma <- rep(0,nrow(train_mar))
+
+y <- train_mar[,2]
 n <- nrow(train_mar)
 
 ##Need input n, y (vector), gamma (vector), and some values for parameters (in computation)
