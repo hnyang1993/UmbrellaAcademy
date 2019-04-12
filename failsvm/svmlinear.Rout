@@ -1,0 +1,139 @@
+
+R version 3.5.2 (2018-12-20) -- "Eggshell Igloo"
+Copyright (C) 2018 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(text2vec)
+> library(data.table)
+> library(magrittr)
+> library(stopwords)
+> library(SnowballC)
+> library(caret)
+Loading required package: lattice
+Loading required package: ggplot2
+> library(glmnet)
+Loading required package: Matrix
+Loading required package: foreach
+Loaded glmnet 2.0-16
+
+> library(kernlab)
+
+Attaching package: ‘kernlab’
+
+The following object is masked from ‘package:ggplot2’:
+
+    alpha
+
+> 
+> setwd("/nas/longleaf/home/yutongl/BIOS735/svm")
+> 
+> sample       <- fread("sample_submission.csv")
+> test         <- fread("test.csv")
+> test_labels  <- fread("test_labels.csv")
+> train.data   <- fread("train.csv")
+> 
+> # undersample nontoxic group
+> toxic.id = which(train.data$toxic==1) # # of toxic = 15294
+> nontoxic.id = which(train.data$toxic==0) # # of nontoxic = 144277
+> set.seed(123)
+> nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
+> train.sample = train.data[c(toxic.id,nontoxic.sampleId),]
+> 
+> test.labels <- test_labels[test_labels$toxic!=-1,]
+> test.data <- test[test_labels$toxic!=-1,]
+> 
+> prep_fun = tolower
+> #stemming words
+> tok_fun = function(x) {
++   word_tokenizer(x) %>% lapply( function(x) SnowballC::wordStem(x,language="en"))
++ }
+> 
+> it_train = itoken(train.sample$comment_text,
++                   preprocessor = prep_fun,
++                   tokenizer = tok_fun,
++                   ids = train.sample$id,
++                   progressbar = TRUE)
+> 
+> it_test = itoken(test.data$comment_text,
++                  preprocessor = prep_fun,
++                  tokenizer = tok_fun,
++                  ids = test.data$id,
++                  progressbar = TRUE)
+> 
+> vocab = create_vocabulary(it_train, ngram=c(1L,3L), stopwords=stopwords("en",source="smart"))
+  |                                                                              |=======                                                               |  10%  |                                                                              |==============                                                        |  20%  |                                                                              |=====================                                                 |  30%  |                                                                              |============================                                          |  40%  |                                                                              |===================================                                   |  50%  |                                                                              |==========================================                            |  60%  |                                                                              |=================================================                     |  70%  |                                                                              |========================================================              |  80%  |                                                                              |===============================================================       |  90%  |                                                                              |======================================================================| 100%
+> 
+> prune.vocab <- prune_vocabulary(vocab, term_count_min = 10)
+> 
+> vectorizer = vocab_vectorizer(prune.vocab)
+> raw.train.dtm = create_dtm(it_train, vectorizer) 
+  |                                                                              |=======                                                               |  10%  |                                                                              |==============                                                        |  20%  |                                                                              |=====================                                                 |  30%  |                                                                              |============================                                          |  40%  |                                                                              |===================================                                   |  50%  |                                                                              |==========================================                            |  60%  |                                                                              |=================================================                     |  70%  |                                                                              |========================================================              |  80%  |                                                                              |===============================================================       |  90%  |                                                                              |======================================================================| 100%> raw.test.dtm = create_dtm(it_test, vectorizer)
+  |                                                                              |=======                                                               |  10%  |                                                                              |==============                                                        |  20%  |                                                                              |=====================                                                 |  30%  |                                                                              |============================                                          |  40%  |                                                                              |===================================                                   |  50%  |                                                                              |==========================================                            |  60%  |                                                                              |=================================================                     |  70%  |                                                                              |========================================================              |  80%  |                                                                              |===============================================================       |  90%  |                                                                              |======================================================================| 100%
+> 
+> ## lasso
+> set.seed(111)
+> feature.selection = cv.glmnet(raw.train.dtm, train.sample$toxic, family = "binomial")
+There were 11 warnings (use warnings() to see them)
+> fit = glmnet(raw.train.dtm, train.sample$toxic, family = "binomial",
++              alpha=1,lambda=feature.selection$lambda.1se)
+> 
+> pred <- predict(fit, raw.test.dtm, type = "class")
+> confusionMatrix(as.factor(as.numeric(pred)), as.factor(test.labels$toxic), positive = "1")
+Confusion Matrix and Statistics
+
+          Reference
+Prediction     0     1
+         0 29665   668
+         1 28223  5422
+                                          
+               Accuracy : 0.5484          
+                 95% CI : (0.5446, 0.5523)
+    No Information Rate : 0.9048          
+    P-Value [Acc > NIR] : 1               
+                                          
+                  Kappa : 0.1332          
+                                          
+ Mcnemar's Test P-Value : <2e-16          
+                                          
+            Sensitivity : 0.89031         
+            Specificity : 0.51246         
+         Pos Pred Value : 0.16115         
+         Neg Pred Value : 0.97798         
+             Prevalence : 0.09519         
+         Detection Rate : 0.08475         
+   Detection Prevalence : 0.52588         
+      Balanced Accuracy : 0.70138         
+                                          
+       'Positive' Class : 1               
+                                          
+> 
+> 
+> ## selected vocab (# = 122)
+> s.vocab <- prune.vocab[which(fit$beta!=0),]
+> s.vectorizer <- vocab_vectorizer(s.vocab)
+> dense.train.dtm <- as.matrix(raw.train.dtm[, which(fit$beta!=0)])
+> test.dtm <- create_dtm(it_test, s.vectorizer)
+  |                                                                              |=======                                                               |  10%  |                                                                              |==============                                                        |  20%  |                                                                              |=====================                                                 |  30%  |                                                                              |============================                                          |  40%  |                                                                              |===================================                                   |  50%  |                                                                              |==========================================                            |  60%  |                                                                              |=================================================                     |  70%  |                                                                              |========================================================              |  80%  |                                                                              |===============================================================       |  90%  |                                                                              |======================================================================| 100%> 
+> ## svmLinear--based on terms selected from lasso
+> set.seed(111)
+> trCtl = trainControl(method = "cv")
+> tg <- data.frame(C=c(1,seq(10,100,10)))
+> fit_svmLinear = train(x = dense.train.dtm, 
++                       y = as.factor(train.sample$toxic), 
++                       method = "svmLinear",
++                       tuneGrid = tg,
++                       trControl = trCtl)

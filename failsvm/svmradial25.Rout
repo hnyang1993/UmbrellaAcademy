@@ -1,0 +1,90 @@
+
+R version 3.5.2 (2018-12-20) -- "Eggshell Igloo"
+Copyright (C) 2018 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(text2vec)
+> library(data.table)
+> library(magrittr)
+> library(stopwords)
+> library(SnowballC)
+> library(caret)
+Loading required package: lattice
+Loading required package: ggplot2
+> library(glmnet)
+Loading required package: Matrix
+Loading required package: foreach
+Loaded glmnet 2.0-16
+
+> library(kernlab)
+
+Attaching package: ‘kernlab’
+
+The following object is masked from ‘package:ggplot2’:
+
+    alpha
+
+> 
+> setwd("/nas/longleaf/home/yutongl/BIOS735/svm")
+> 
+> load("prelasso.RData")
+> 
+> ## svmRadial--based on terms selected from lasso
+> set.seed(111)
+> trCtl = trainControl(method = "cv") 
+> tg <- expand.grid(C =25, sigma = c(0.01, 0.05, 0.1, 0.25, 0.5, 0.75,1))
+> fit_svmRadial = train(x = dense.train.dtm, 
++                       y = as.factor(train.sample$toxic), 
++                       method = "svmRadial", 
++                       tuneGrid = tg,
++                       trControl = trCtl)
+> pred_svmRadial = predict(fit_svmRadial, as.matrix(test.dtm))
+> confusionMatrix(pred_svmRadial, as.factor(test.labels$toxic), positive = "1")
+Confusion Matrix and Statistics
+
+          Reference
+Prediction     0     1
+         0 35692  1077
+         1 22196  5013
+                                        
+               Accuracy : 0.6362        
+                 95% CI : (0.6325, 0.64)
+    No Information Rate : 0.9048        
+    P-Value [Acc > NIR] : 1             
+                                        
+                  Kappa : 0.1723        
+                                        
+ Mcnemar's Test P-Value : <2e-16        
+                                        
+            Sensitivity : 0.82315       
+            Specificity : 0.61657       
+         Pos Pred Value : 0.18424       
+         Neg Pred Value : 0.97071       
+             Prevalence : 0.09519       
+         Detection Rate : 0.07836       
+   Detection Prevalence : 0.42529       
+      Balanced Accuracy : 0.71986       
+                                        
+       'Positive' Class : 1             
+                                        
+> 
+> 
+> 
+> save(fit_svmRadial$results, file = "./svmRadial25.RData")
+Error in save(fit_svmRadial$results, file = "./svmRadial25.RData") : 
+  object ‘fit_svmRadial$results’ not found
+Execution halted
