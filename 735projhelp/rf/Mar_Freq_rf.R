@@ -22,7 +22,7 @@ rfGrid <- expand.grid(mtry=c(2, 4, 8, 12, 16, 20, 24, 28, 32, 36))
 trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
 fit <- train(train_mar, as.factor(train_mar_y), method="rf", trControl=trCtl, tuneGrid = rfGrid)
 
-result <- fit$result
+result <- fit
 
 ## save output to .RData file
 save(result, file = filename)
