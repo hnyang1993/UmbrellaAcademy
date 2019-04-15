@@ -11,7 +11,7 @@ mkdir $i
 cp *.R ./$i
 cd ./$i
 
-sbatch -p general -N 1 --mem=5g -n 1 -t 24:00:00 --job-name=svmcv R CMD BATCH --no-save Mar_Freq_svm.R Mar_Freq_svm.Rout
+sbatch -p general -N 1 --mem=5g -n 1 -t 7- --job-name=svmcv R CMD BATCH --no-save Mar_Freq_svm.R Mar_Freq_svm.Rout
 
 cd ../
 done
