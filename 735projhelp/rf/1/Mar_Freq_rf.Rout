@@ -1,0 +1,53 @@
+
+R version 3.5.2 (2018-12-20) -- "Eggshell Igloo"
+Copyright (C) 2018 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ## generate seed by directory name
+> path <- getwd()
+> seed <- as.numeric(tail(unlist(strsplit(path, '/')), 1))
+> set.seed(seed)
+> filename <- paste("rfCV",seed,".RData",sep="")
+> 
+> 
+> library(Matrix)
+> library(data.table)
+> train_mar <- readMM("/nas/longleaf/home/yutongl/BIOS735/735projhelp/rf/train_mar.txt")
+> train_mar <- as.matrix(train_mar)
+> keyword <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/rf/key_word_list.csv", stringsAsFactors = FALSE)
+> colnames(train_mar) <- keyword[,2]
+> train_mar_id <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/rf/train_mar_id.csv", stringsAsFactors=FALSE)
+> train_mar_y <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/rf/train_mar_label.csv", stringsAsFactors=FALSE)
+> 
+> train_mar_y <- train_mar_y$toxic
+> 
+> library(caret)
+Loading required package: lattice
+Loading required package: ggplot2
+> rfGrid <- expand.grid(mtry=c(2, 4, 8, 12, 16, 20, 24, 28, 32, 36))
+> 
+> trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
+> fit <- train(train_mar, as.factor(train_mar_y), method="rf", trControl=trCtl, tuneGrid = rfGrid)
+> 
+> result <- fit
+> 
+> ## save output to .RData file
+> save(result, file = filename)
+> 
+> proc.time()
+      user     system    elapsed 
+202703.029    494.851 203299.354 
