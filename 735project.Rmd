@@ -1,0 +1,173 @@
+---
+title: "Toxic Comment Classification"
+author: 'Umbrella Academy: Yutong Liu, Yu Gu, Beilin Jia, Hannan Yang, Mochuan Liu'
+date: "4/18/2019"
+output: html_document
+---
+Link to Project Groups and Instructions
+https://docs.google.com/document/d/1JCwMYaIVjGyIKKOJKyBTlva63OEBd_4aCASiZWBSHbM/edit?usp=sharing
+
+
+# 1. Introduction
+Our project is inspired by the following competition from kaggle:  
+https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/overview
+
+Internet is now a very important part of our life, we could obtain knowledge, get most recent news update and entertainment. However, as it provides us convenience and pleasure, sometimes unfriendly comments or messages of others may upset people and make them less likely to go online, leave comments to posts or ask technical questions. Many platforms are now struggling about the problem that comments leave by users might be considered profane, vulgar, or offensive.
+
+One possible approach of improving this is to develop methods and algorithms that could identify negative online behaviors (i.e. “toxic comments”), like comments that are rude, disrespectful or otherwise likely to make someone else to leave a discussion because of the threat of abuse or harassment. The Conversation AI team, a research initiative founded by Jigsaw and Google (both a part of Alphabet) are working on tools to help improve online conversation and they initiated this competition on Kaggle. 
+ 
+In this project, we aim to develop a method that is capable of detecting different types of toxicity such as threats, obscenity, insults and identity-based hate. Our training and testing datasets will both be of comments from Wikipedia’s talk page edits. We hope to develop a method which could help online discussion become more productive and respectful by successfully identify the “toxic” comments. 
+
+
+# 2. Data Description
+We are provided with a large number of Wikipedia comments which have been labeled by human raters for toxic behavior. The types of toxicity are: toxic, severe toxic, obscene, threat, insult, identity_hate. The only type of toxicity (label) involved in the following analysis will be “toxic”. The training dataset is a 160k * 8 matrix containing id, text comment, and 6 types of toxicity. The text comments were stored as strings and contains meaningful covariates (like keywords or phrases) for toxicity classification.  
+  
+  
+
+**examples of toxic and nontoxic comments**  
+  toxic comment: *Bye! Don’t look, come or think of comming back! Tosser.*  
+  nontoxic comment: *Congratulations from me as well, use the tools well. *
+
+For the purpose of this project, our target label is “toxic”. We’re going to include all 15294 samples which were rated as “toxic”. We down-sampled the samples with “non-toxic” labels to have the same size as the “toxic” samples and form a new subset of the original training dataset, then restrict model training only on this subset. The testing dataset contains the comments from approximately 153k subjects, the true “toxic” labels for the subjects in the testing dataset are also provided so we may compute the misclassification error rate between the predicted and true “toxic” labels.
+
+# 3. Methods
+###Important preprocessing
+The first step was to convert comments into features that we could use for our model. To do this, we used the R package “text2vec” to tokenize the data (split each sentence into words). Following tokenization, we applied stemming with the R package “SnowballC” which reduces inflections/variations of a word to a common root by slicing off the ends of words down to the maximum string contained in all variations (e.g. operate, operates, operation, operations, operated, all become “operat”). The most frequent words are often those which carry very little semantic weight (grammatical function words).[1] They were deleted with the help of R package “stopwords”.  
+
+We then applied count vectorization by 1) finding the vocabulary of length $p$, which contains all tokens, bigrams (of tokens) and trigrams (of tokens) that appear at least 10 times across all comments in the data; 2) for each comment, we get a vector of length $p$, where for each token/bigram/trigram in the vocabulary, the value is the number of times that said token appeared in the message. 
+
+###Lasso →  random forest, svm
+After preprocessing , we still have a large set of candidate “keywords”, which makes it hard to implement methods like random forest and svm. To solve this problem, we first use 10-fold cross validation and lasso to do variable selection, which selects 122 “keywords” to determine whether a comment is toxic or nontoxic. Then we use these selected “keywords” to do classification, with both random forest algorithm and svm algorithm. For the svm algorithm, we use both the linear kernel and the radial kernel. In this process, the most essential thing is to tune parameters with cross validation. We start with a large pool of candidate parameters for both of the two methods, thus it takes quite a long time to find the best tuning parameters.
+
+###Marginal frequency →  random forest, svm
+Another approach to do variable selection is to train among weak classifiers. In the negative-positive natural language classification problem, the sentiment tendency of a single sentence is, in general, the cumulative sentiment tendency of words/phrases with clear emotion implications. Similar idea can be applied to improve and accelerate the toxic/non-toxic classification problem by selecting words/phrases with a clear toxic/non-toxic tendency and restricting on selected features.  
+
+The main problem of this approach is to reasonably identify which words/phrases are toxic/non-toxic. From a machine learning perspective, each word/phrase with a clear emotion tendency can be viewed as a weak classifier in a 1-dimension space and a good weak classifier should at least have the minimum classification accuracy, that is, can correctly classify a sentence with probability strictly larger than 0.5; or equivalently, this is just to say that word/phrase with a clear toxic/non-toxic tendency should have different frequencies in toxic and non-toxic data. Following this idea, we propose a measure of frequency difference which is defined as
+   $$diff(w)=\frac{|f_{1}(w)-f_{2}(w)|}{max\{f_1(w),f_2(w)\}}$$
+
+where $f_1(w)$ and $f_0(w)$ denote the word/phrase frequency in toxic and non-toxic respectively. The frequency difference can be estimated using training data and a word/phrase is said to have a clear toxic/non-toxic tendency iff $\hat{d}(w)>0.02$. 
+In practice, we do similar preprocessing by tokenizing the data first and compute the frequency difference based on the tokenized frequency table. In addition to the frequency difference lower bound, to exclude rare keywords we also require that the total count of the given word/phrase should be larger than 10. For simplicity and practical consideration, we break the selected phrases into word lists. After variable selection, the final training data has 277 columns of total counts of 277 unique keywords for each training comments. 
+
+###Application of EM algorithm: Finite Mixture Logistic Regression
+The previous datasets were obtained after selecting the keywords correlated to the label “toxic”: logistic regression with lasso eliminated variables by l1 penalization while marginal frequency thresholding eliminated variables that have similar distributions within toxic samples and non-toxic samples. Here one might be interested in checking if each of the selected variables (keywords) indeed has predictive values for classifying toxicity. We proposed a mixture model with two classes and model the occurrence of a specific keyword in each of the classes by logistic regression with offset (adjusting for the length of the comment). By estimating the parameters in the mixture model, one may calculate the posterior probabilities of falling into specific class given the occurrence of a specific keyword, so that check if the individual selected keyword have discriminatory power.
+
+
+
+# 4. Results
+```{r,eval=FALSE}
+library(text2vec)
+library(Matrix)
+library(data.table)
+library(magrittr)
+library(stopwords)
+library(SnowballC)
+library(caret)
+library(glmnet)
+library(tree)
+library(randomForest)
+library(UmbrellaAcademy)
+### read data
+setwd("/pine/scr/b/j/bjia7/735project/")
+sample       <- fread("sample_submission.csv")
+test         <- fread("test.csv")
+test_labels  <- fread("test_labels.csv")
+train.data   <- fread("train.csv")
+
+# undersample nontoxic group
+toxic.id = which(train.data$toxic==1) # # of toxic = 15294
+nontoxic.id = which(train.data$toxic==0) # # of nontoxic = 144277
+set.seed(123)
+nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
+train.sample = train.data[c(toxic.id,nontoxic.sampleId),]
+
+### preprocess data
+data.pre <- preprocess_function(traindata, testdata, prep_fun = tolower, tok_fun = tok_fun)
+train.dtm <- data.pre$train.dtm
+test.dtm <- data.pre$test.dtm
+
+### LASSO
+set.seed(111)
+feature.selection = cv.glmnet(train.dtm, train.sample$toxic, family = "binomial",type.measure = "auc")
+
+beta = coef(feature.selection,lambda = feature.selection$lambda.1se)
+s.train <- train.dtm[,which(beta!=0)]
+dense.train.dtm <- as.matrix(s.train)
+
+### LASSO --> random forest
+control <- trainControl(method="cv", number=10, search="grid")
+metric <- "Accuracy"
+set.seed(1)
+p <- dim(dense.train.dtm)[2]
+tunegrid <- expand.grid(.mtry=c(2^(0:6),p))
+rf_gridsearch <- train(dense.train.dtm, train.sample$toxic, 
+                       method="rf", metric=metric, tuneGrid=tunegrid, 
+                       trControl=control)
+
+### LASSO --> SVM
+## SVM Radial
+set.seed(111)
+trCtl = trainControl(method = "cv")
+tg <- data.frame(C = c(1,seq(10,100,10)), sigma = c(0.1,0.25,0.5,0.75,1,1.25,1.5,1.75,2))
+fit_svmRadial = train(x = dense.train.dtm, 
+                      y = as.factor(train.sample$toxic), 
+                      method = "svmRadial", 
+                      tuneGrid = tg,
+                      trControl = trCtl)
+pred_svmRadial = predict(fit_svmRadial, as.matrix(test.dtm))
+confusionMatrix(pred_svmRadial, as.factor(test.labels$toxic), positive = "1")
+
+
+## SVM Linear
+set.seed(111)
+trCtl = trainControl(method = "cv")
+tg <- data.frame(C=c(1,seq(10,100,10)))
+fit_svmLinear = train(x = dense.train.dtm, 
+                      y = as.factor(train.sample$toxic), 
+                      method = "svmLinear",
+                      tuneGrid = tg,
+                      trControl = trCtl)
+pred_svmLinear = predict(fit_svmLinear, as.matrix(test.dtm))
+confusionMatrix(pred_svmLinear, as.factor(test.labels$toxic), positive = "1")
+
+### Marginal Frequency 
+train_mar <- readMM("/nas/longleaf/home/hnyang/735proj/rf/train_mar.txt")
+train_mar <- as.matrix(train_mar)
+keyword <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/key_word_list.csv", stringsAsFactors = FALSE)
+colnames(train_mar) <- keyword[,2]
+train_mar_id <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/train_mar_id.csv", stringsAsFactors=FALSE)
+train_mar_y <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/train_mar_label.csv", stringsAsFactors=FALSE)
+
+train_mar_y <- train_mar_y$toxic
+
+### marginal frequency --> random forest
+rfGrid <- expand.grid(mtry=c(2, 4, 8, 12, 16, 20, 24, 28, 32, 36))
+
+trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
+fit <- train(train_mar, as.factor(train_mar_y), method="rf", trControl=trCtl, tuneGrid = rfGrid)
+
+### margianl frequency --> SVM linear
+svmGrid <- expand.grid(C=seq(10,100,by=10))
+
+trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
+fit <- train(train_mar, as.factor(train_mar_y), method="svmLinear", trControl=trCtl, tuneGrid = svmGrid)
+
+```
+
+
+
+# 5. Discussion
+###Strengths: 
+* Our method is easy to implement and the results are interpretable. It’s feasible to apply our method to other datasets of toxic comments and to classify other types of comments such as favorable/negative review.   
+
+
+###Limitation:
+* The selection of tuning parameters for both random forest and SVM is computationally intensive (mainly due to the use of package `caret` when training rf and svm).  
+
+* We subsample our training set to create a balanced dataset to build and train our models, which may cause the loss of information of the nontoxic group. What’s more, we predict the results based on a much larger test dataset (size of 63k records), comparing with the training set of 30k records. The difference in size of training and testing set may lead to inaccuracy in both toxic and nontoxic prediction.  
+
+###Moving forward:
+* Some comments cannot be classified correctly due to the way that we tokenize and vectorize comments. We can improve this by looking at specific patterns of comments. 
+Other machine learning techniques such as xgboost can be explored and applied for a better prediction results. 
+
+# 6. References
+[1] Word frequency data https://www.wordfrequency.info/free.asp?s=y
