@@ -156,7 +156,7 @@ fit <- train(train_mar, as.factor(train_mar_y), method="svmLinear", trControl=tr
 
 
 # 5. Discussion
-###Strengthes: 
+###Strengths: 
 * Our method is easy to implement and the results are interpretable. It’s feasible to apply our method to other datasets of toxic comments and to classify other types of comments such as favorable/negative review.   
 
 
