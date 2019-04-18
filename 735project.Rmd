@@ -25,8 +25,8 @@ We are provided with a large number of Wikipedia comments which have been labele
   
 
 **examples of toxic and nontoxic comments**  
-  toxic: *Bye! Don’t look, come or think of comming back! Tosser.*  
-  nontoxic: *Congratulations from me as well, use the tools well. *
+  toxic comment: *Bye! Don’t look, come or think of comming back! Tosser.*  
+  nontoxic comment: *Congratulations from me as well, use the tools well. *
 
 For the purpose of this project, our target label is “toxic”. We’re going to include all 15294 samples which were rated as “toxic”. We down-sampled the samples with “non-toxic” labels to have the same size as the “toxic” samples and form a new subset of the original training dataset, then restrict model training only on this subset. The testing dataset contains the comments from approximately 153k subjects, the true “toxic” labels for the subjects in the testing dataset are also provided so we may compute the misclassification error rate between the predicted and true “toxic” labels.
 
@@ -54,7 +54,104 @@ The previous datasets were obtained after selecting the keywords correlated to t
 
 
 # 4. Results
+```{r,eval=FALSE}
+library(text2vec)
+library(Matrix)
+library(data.table)
+library(magrittr)
+library(stopwords)
+library(SnowballC)
+library(caret)
+library(glmnet)
+library(tree)
+library(randomForest)
+library(UmbrellaAcademy)
+### read data
+setwd("/pine/scr/b/j/bjia7/735project/")
+sample       <- fread("sample_submission.csv")
+test         <- fread("test.csv")
+test_labels  <- fread("test_labels.csv")
+train.data   <- fread("train.csv")
 
+# undersample nontoxic group
+toxic.id = which(train.data$toxic==1) # # of toxic = 15294
+nontoxic.id = which(train.data$toxic==0) # # of nontoxic = 144277
+set.seed(123)
+nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
+train.sample = train.data[c(toxic.id,nontoxic.sampleId),]
+
+### preprocess data
+data.pre <- preprocess_function(traindata, testdata, prep_fun = tolower, tok_fun = tok_fun)
+train.dtm <- data.pre$train.dtm
+test.dtm <- data.pre$test.dtm
+
+### LASSO
+set.seed(111)
+feature.selection = cv.glmnet(train.dtm, train.sample$toxic, family = "binomial",type.measure = "auc")
+
+beta = coef(feature.selection,lambda = feature.selection$lambda.1se)
+s.train <- train.dtm[,which(beta!=0)]
+dense.train.dtm <- as.matrix(s.train)
+
+### LASSO --> random forest
+control <- trainControl(method="cv", number=10, search="grid")
+metric <- "Accuracy"
+set.seed(1)
+p <- dim(dense.train.dtm)[2]
+tunegrid <- expand.grid(.mtry=c(2^(0:6),p))
+rf_gridsearch <- train(dense.train.dtm, train.sample$toxic, 
+                       method="rf", metric=metric, tuneGrid=tunegrid, 
+                       trControl=control)
+
+### LASSO --> SVM
+## SVM Radial
+set.seed(111)
+trCtl = trainControl(method = "cv")
+tg <- data.frame(C = c(1,seq(10,100,10)), sigma = c(0.1,0.25,0.5,0.75,1,1.25,1.5,1.75,2))
+fit_svmRadial = train(x = dense.train.dtm, 
+                      y = as.factor(train.sample$toxic), 
+                      method = "svmRadial", 
+                      tuneGrid = tg,
+                      trControl = trCtl)
+pred_svmRadial = predict(fit_svmRadial, as.matrix(test.dtm))
+confusionMatrix(pred_svmRadial, as.factor(test.labels$toxic), positive = "1")
+
+
+## SVM Linear
+set.seed(111)
+trCtl = trainControl(method = "cv")
+tg <- data.frame(C=c(1,seq(10,100,10)))
+fit_svmLinear = train(x = dense.train.dtm, 
+                      y = as.factor(train.sample$toxic), 
+                      method = "svmLinear",
+                      tuneGrid = tg,
+                      trControl = trCtl)
+pred_svmLinear = predict(fit_svmLinear, as.matrix(test.dtm))
+confusionMatrix(pred_svmLinear, as.factor(test.labels$toxic), positive = "1")
+
+### Marginal Frequency 
+train_mar <- readMM("/nas/longleaf/home/hnyang/735proj/rf/train_mar.txt")
+train_mar <- as.matrix(train_mar)
+keyword <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/key_word_list.csv", stringsAsFactors = FALSE)
+colnames(train_mar) <- keyword[,2]
+train_mar_id <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/train_mar_id.csv", stringsAsFactors=FALSE)
+train_mar_y <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/train_mar_label.csv", stringsAsFactors=FALSE)
+
+train_mar_y <- train_mar_y$toxic
+
+### marginal frequency --> random forest
+rfGrid <- expand.grid(mtry=c(2, 4, 8, 12, 16, 20, 24, 28, 32, 36))
+
+trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
+fit <- train(train_mar, as.factor(train_mar_y), method="rf", trControl=trCtl, tuneGrid = rfGrid)
+
+### margianl frequency --> SVM linear
+svmGrid <- expand.grid(C=seq(10,100,by=10))
+
+trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
+fit <- train(train_mar, as.factor(train_mar_y), method="svmLinear", trControl=trCtl, tuneGrid = svmGrid)
+
+```
 
 
 
