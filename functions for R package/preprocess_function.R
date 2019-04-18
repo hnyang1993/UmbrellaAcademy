@@ -26,6 +26,6 @@ preprocess <- function(traindata, testdata, prep_fun = tolower, tok_fun = tok_fu
   
   raw.test.dtm = create_dtm(it_test, vectorizer)
 
-  return(list("train.dtm" = "raw.dtm",
-              "test.dtm"  = "raw.test.dtm")) 
+  return(list(train.dtm = raw.dtm,
+              test.dtm  = raw.test.dtm)) 
 }
