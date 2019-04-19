@@ -84,7 +84,7 @@ test_labels_use <- test_labels[test_labels$toxic!=-1,]
 test_use <- test[test_labels$toxic!=-1,]
 
 ### preprocess data
-data.pre <- preprocess_function(traindata = train.sample, testdata = test_use, 
+data.pre <- preprocess(traindata = train.sample, testdata = test_use, 
                                 prep_fun = tolower, tok_fun = tok_fun)
 train.dtm <- data.pre$train.dtm
 test.dtm  <- data.pre$test.dtm
@@ -111,14 +111,14 @@ rf_gridsearch <- train(dense.train.dtm, train.sample$toxic,
 ## SVM Radial
 set.seed(111)
 trCtl = trainControl(method = "cv")
-tg <- data.frame(C = c(1,seq(10,100,10)), sigma = c(0.1,0.25,0.5,0.75,1,1.25,1.5,1.75,2))
+tg <- expand.grid(C = seq(10,90,20)), sigma = c(0.5,1,1.5,2,3,4,5,7,9))
 fit_svmRadial = train(x = dense.train.dtm, 
                       y = as.factor(train.sample$toxic), 
                       method = "svmRadial", 
                       tuneGrid = tg,
                       trControl = trCtl)
 pred_svmRadial = predict(fit_svmRadial, as.matrix(test.dtm))
-confusionMatrix(pred_svmRadial, as.factor(test.labels$toxic), positive = "1")
+cm_rsvm = confusionMatrix(pred_svmRadial, as.factor(test.labels$toxic), positive = "1")
 
 
 ## SVM Linear
@@ -131,7 +131,7 @@ fit_svmLinear = train(x = dense.train.dtm,
                       tuneGrid = tg,
                       trControl = trCtl)
 pred_svmLinear = predict(fit_svmLinear, as.matrix(test.dtm))
-confusionMatrix(pred_svmLinear, as.factor(test.labels$toxic), positive = "1")
+cm_lsvm = confusionMatrix(pred_svmLinear, as.factor(test.labels$toxic), positive = "1")
 
 ### Marginal Frequency 
 train_mar <- readMM("/nas/longleaf/home/hnyang/735proj/rf/train_mar.txt")

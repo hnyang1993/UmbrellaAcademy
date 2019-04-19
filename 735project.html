@@ -204,8 +204,8 @@ $(document).ready(function () {
 <h1>2. Data Description</h1>
 <p>We are provided with a large number of Wikipedia comments which have been labeled by human raters for toxic behavior. The types of toxicity are: toxic, severe toxic, obscene, threat, insult, identity_hate. The only type of toxicity (label) involved in the following analysis will be “toxic”. The training dataset is a 160k * 8 matrix containing id, text comment, and 6 types of toxicity. The text comments were stored as strings and contains meaningful covariates (like keywords or phrases) for toxicity classification.</p>
 <p><strong>examples of toxic and nontoxic comments</strong><br />
-toxic: <em>Bye! Don’t look, come or think of comming back! Tosser.</em><br />
-nontoxic: <em>Congratulations from me as well, use the tools well. </em></p>
+toxic comment: <em>Bye! Don’t look, come or think of comming back! Tosser.</em><br />
+nontoxic comment: <em>Congratulations from me as well, use the tools well. </em></p>
 <p>For the purpose of this project, our target label is “toxic”. We’re going to include all 15294 samples which were rated as “toxic”. We down-sampled the samples with “non-toxic” labels to have the same size as the “toxic” samples and form a new subset of the original training dataset, then restrict model training only on this subset. The testing dataset contains the comments from approximately 153k subjects, the true “toxic” labels for the subjects in the testing dataset are also provided so we may compute the misclassification error rate between the predicted and true “toxic” labels.</p>
 </div>
 <div id="methods" class="section level1">
@@ -232,11 +232,110 @@ nontoxic: <em>Congratulations from me as well, use the tools well. </em></p>
 </div>
 <div id="results" class="section level1">
 <h1>4. Results</h1>
+<pre class="r"><code>library(text2vec)
+library(Matrix)
+library(data.table)
+library(magrittr)
+library(stopwords)
+library(SnowballC)
+library(caret)
+library(glmnet)
+library(tree)
+library(randomForest)
+library(UmbrellaAcademy)
+### read data
+setwd(&quot;/pine/scr/b/j/bjia7/735project/&quot;)
+test         &lt;- fread(&quot;test.csv&quot;)
+test_labels  &lt;- fread(&quot;test_labels.csv&quot;)
+train.data   &lt;- fread(&quot;train.csv&quot;)
+
+# undersample nontoxic group
+toxic.id    = which(train.data$toxic==1) # # of toxic = 15294
+nontoxic.id = which(train.data$toxic==0) # # of nontoxic = 144277
+set.seed(123)
+nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
+train.sample      = train.data[c(toxic.id,nontoxic.sampleId),]
+
+# exclude text_label = -1
+test_labels_use &lt;- test_labels[test_labels$toxic!=-1,]
+test_use &lt;- test[test_labels$toxic!=-1,]
+
+### preprocess data
+data.pre &lt;- preprocess(traindata = train.sample, testdata = test_use, 
+                                prep_fun = tolower, tok_fun = tok_fun)
+train.dtm &lt;- data.pre$train.dtm
+test.dtm  &lt;- data.pre$test.dtm
+
+### LASSO
+set.seed(111)
+feature.selection = cv.glmnet(train.dtm, train.sample$toxic, family = &quot;binomial&quot;,type.measure = &quot;auc&quot;)
+
+beta = coef(feature.selection,lambda = feature.selection$lambda.1se)
+s.train &lt;- train.dtm[,which(beta!=0)]
+dense.train.dtm &lt;- as.matrix(s.train)
+
+### LASSO --&gt; random forest
+control &lt;- trainControl(method=&quot;cv&quot;, number=10, search=&quot;grid&quot;)
+metric &lt;- &quot;Accuracy&quot;
+set.seed(1)
+p &lt;- dim(dense.train.dtm)[2]
+tunegrid &lt;- expand.grid(.mtry=c(2^(0:6),p))
+rf_gridsearch &lt;- train(dense.train.dtm, train.sample$toxic, 
+                       method=&quot;rf&quot;, metric=metric, tuneGrid=tunegrid, 
+                       trControl=control)
+
+### LASSO --&gt; SVM
+## SVM Radial
+set.seed(111)
+trCtl = trainControl(method = &quot;cv&quot;)
+tg &lt;- expand.grid(C = seq(10,90,20)), sigma = c(0.5,1,1.5,2,3,4,5,7,9))
+fit_svmRadial = train(x = dense.train.dtm, 
+                      y = as.factor(train.sample$toxic), 
+                      method = &quot;svmRadial&quot;, 
+                      tuneGrid = tg,
+                      trControl = trCtl)
+pred_svmRadial = predict(fit_svmRadial, as.matrix(test.dtm))
+cm_rsvm = confusionMatrix(pred_svmRadial, as.factor(test.labels$toxic), positive = &quot;1&quot;)
+
+
+## SVM Linear
+set.seed(111)
+trCtl = trainControl(method = &quot;cv&quot;)
+tg &lt;- data.frame(C=c(1,seq(10,100,10)))
+fit_svmLinear = train(x = dense.train.dtm, 
+                      y = as.factor(train.sample$toxic), 
+                      method = &quot;svmLinear&quot;,
+                      tuneGrid = tg,
+                      trControl = trCtl)
+pred_svmLinear = predict(fit_svmLinear, as.matrix(test.dtm))
+cm_lsvm = confusionMatrix(pred_svmLinear, as.factor(test.labels$toxic), positive = &quot;1&quot;)
+
+### Marginal Frequency 
+train_mar &lt;- readMM(&quot;/nas/longleaf/home/hnyang/735proj/rf/train_mar.txt&quot;)
+train_mar &lt;- as.matrix(train_mar)
+keyword &lt;- read.csv(&quot;/nas/longleaf/home/hnyang/735proj/rf/key_word_list.csv&quot;, stringsAsFactors = FALSE)
+colnames(train_mar) &lt;- keyword[,2]
+train_mar_id &lt;- read.csv(&quot;/nas/longleaf/home/hnyang/735proj/rf/train_mar_id.csv&quot;, stringsAsFactors=FALSE)
+train_mar_y &lt;- read.csv(&quot;/nas/longleaf/home/hnyang/735proj/rf/train_mar_label.csv&quot;, stringsAsFactors=FALSE)
+
+train_mar_y &lt;- train_mar_y$toxic
+
+### marginal frequency --&gt; random forest
+rfGrid &lt;- expand.grid(mtry=c(2, 4, 8, 12, 16, 20, 24, 28, 32, 36))
+
+trCtl &lt;- trainControl(method=&quot;cv&quot;, number=10, savePredictions=FALSE)
+fit &lt;- train(train_mar, as.factor(train_mar_y), method=&quot;rf&quot;, trControl=trCtl, tuneGrid = rfGrid)
+
+### margianl frequency --&gt; SVM linear
+svmGrid &lt;- expand.grid(C=seq(10,100,by=10))
+
+trCtl &lt;- trainControl(method=&quot;cv&quot;, number=10, savePredictions=FALSE)
+fit &lt;- train(train_mar, as.factor(train_mar_y), method=&quot;svmLinear&quot;, trControl=trCtl, tuneGrid = svmGrid)</code></pre>
 </div>
 <div id="discussion" class="section level1">
 <h1>5. Discussion</h1>
-<div id="strengthes" class="section level3">
-<h3>Strengthes:</h3>
+<div id="strengths" class="section level3">
+<h3>Strengths:</h3>
 <ul>
 <li>Our method is easy to implement and the results are interpretable. It’s feasible to apply our method to other datasets of toxic comments and to classify other types of comments such as favorable/negative review.</li>
 </ul>
