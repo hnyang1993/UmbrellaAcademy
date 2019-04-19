@@ -79,8 +79,12 @@ set.seed(123)
 nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
 train.sample      = train.data[c(toxic.id,nontoxic.sampleId),]
 
+# exclude text_label = -1
+test_labels_use <- test_labels[test_labels$toxic!=-1,]
+test_use <- test[test_labels$toxic!=-1,]
+
 ### preprocess data
-data.pre <- preprocess_function(traindata = train.sample, testdata = test, 
+data.pre <- preprocess_function(traindata = train.sample, testdata = test_use, 
                                 prep_fun = tolower, tok_fun = tok_fun)
 train.dtm <- data.pre$train.dtm
 test.dtm  <- data.pre$test.dtm
