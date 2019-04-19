@@ -68,22 +68,22 @@ library(randomForest)
 library(UmbrellaAcademy)
 ### read data
 setwd("/pine/scr/b/j/bjia7/735project/")
-sample       <- fread("sample_submission.csv")
 test         <- fread("test.csv")
 test_labels  <- fread("test_labels.csv")
 train.data   <- fread("train.csv")
 
 # undersample nontoxic group
-toxic.id = which(train.data$toxic==1) # # of toxic = 15294
+toxic.id    = which(train.data$toxic==1) # # of toxic = 15294
 nontoxic.id = which(train.data$toxic==0) # # of nontoxic = 144277
 set.seed(123)
 nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
-train.sample = train.data[c(toxic.id,nontoxic.sampleId),]
+train.sample      = train.data[c(toxic.id,nontoxic.sampleId),]
 
 ### preprocess data
-data.pre <- preprocess_function(traindata, testdata, prep_fun = tolower, tok_fun = tok_fun)
+data.pre <- preprocess_function(traindata = train.sample, testdata = test, 
+                                prep_fun = tolower, tok_fun = tok_fun)
 train.dtm <- data.pre$train.dtm
-test.dtm <- data.pre$test.dtm
+test.dtm  <- data.pre$test.dtm
 
 ### LASSO
 set.seed(111)
