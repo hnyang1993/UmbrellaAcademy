@@ -1,6 +1,6 @@
 #' Tokenization function for string splitting
 #'
-#' This function improves the simple function \strong{word_tokenizer} by applying stemming after tokenization.
+#' This function improves the simple function \strong{word_tokenizer} in \strong{\emph{text2vec}} package by applying stemming after tokenization.
 #'
 #' @param x character vector
 #'
