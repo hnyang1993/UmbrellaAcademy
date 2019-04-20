@@ -1,12 +1,36 @@
-## Text Mining Packages
-## require(text2vec)
-## require(data.table)
-## require(magrittr)
-## require(stopwords)
-## require(SnowballC)
-##
-
-## Input a comment data set with comment column named as comment_text
+#' Find informative keywords based on marginal frequency difference 
+#' for toxic and non-toxic classification problem
+#' 
+#' This function computes the marginal frequency difference table (using function \strong{tokenizer} from \strong{\emph{text2vec}} package) for a given input comment
+#' dataset and return a list of selected informative keywords, along with the complete frequency table. Keywords are identified as informative if 
+#' the marginal frequency difference in toxic and non-toxic comments exceeds the prefixed threshold.
+#' 
+#' @param commentData A dataframe of input comment data
+#' @param label A 0-1 vector of toxic label corresponding to the input comment data. The function requires 
+#' that toxic comment has lebel 1 and non-toxic comment has label 0
+#' @param f A function to compute the marginal frequency. By default the marginal frequency difference is 
+#' defined as 
+#' \deqn{d(w)=\frac{|f_1(w)-f_2(w)|}{max\{|f_1(w),f_2(w)|\}}.}
+#' @param id Column's name for comment id. By Default is 'id'
+#' @param colname Column's name for comment text. By default is 'comment_text'
+#' @param min_count Minimum count for a keyword/phrase to be considered. By default is 10
+#' @param threshold Threshold of marginal frequency difference for keywords to be identified as informative.By default is 0.02
+#'  
+#' @return The function will return a keyword list of selected informative keywords and the complete frequency table for all keywords
+#' \describe{
+#'   \item{keyword}{A vector of selected keywords}
+#'   \item{freq.table}{Complete frequency table for all keywords}
+#' }
+#' @examples
+#' Marginal_Freq(train.data, train.data$toxic)
+#' 
+#' @import text2vec
+#' @import data.table
+#' @import magrittr
+#' @import stopwords
+#' @import SnowballC
+#'
+#' @export
 Marginal_Freq <- function(commentData, label, f = NULL, id = 'id', colname = 'comment_text', min_count = 10, threshold = 0.02){
   
   ## Change column name to default 'id'
@@ -24,11 +48,11 @@ Marginal_Freq <- function(commentData, label, f = NULL, id = 'id', colname = 'co
   N.nontoxic <- dim(data.nontoxic)[1]
   
   ## Text Mining Packages
-  require(text2vec)
-  require(data.table)
-  require(magrittr)
-  require(stopwords)
-  require(SnowballC)
+  #require(text2vec)
+  #require(data.table)
+  #require(magrittr)
+  #require(stopwords)
+  #require(SnowballC)
   ##
   
   ## Translate character to lower case
