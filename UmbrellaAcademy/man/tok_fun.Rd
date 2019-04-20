@@ -13,7 +13,7 @@ tok_fun(x)
 a list of character vectors, each element of the list contains vector of tokens.
 }
 \description{
-This function improves the simple `word_tokenizer` by applying stemming after tokenization.
+This function improves the simple function \strong{word_tokenizer} by applying stemming after tokenization.
 }
 \examples{
 doc = c("I feel happy", "I get a feeling of happiness", "She feels happy")

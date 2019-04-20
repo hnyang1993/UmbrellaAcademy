@@ -1,6 +1,6 @@
 #' Tokenization function for string splitting
 #'
-#' This function improves the simple `word_tokenizer` by applying stemming after tokenization.
+#' This function improves the simple function \strong{word_tokenizer} by applying stemming after tokenization.
 #'
 #' @param x character vector
 #'
@@ -24,15 +24,20 @@ word_tokenizer(x) %>% lapply( function(x) SnowballC::wordStem(x,language="en"))
 #' This function converts raw comments data to a document-term matrix that can be used for classification.
 #' By using up to 3-grams and then pruning vocabulary, it can significantly reduce the dimension.
 #'
-#' @param traindata a matrix, list or data frame for training, with one of its columns named "comment_text".
-#' @param testdata a matrix, list or data frame for test, with one of its columns named "comment_text".
-#' @param prep_fun a function which takes chunk of character vectors and does all pre-processing.
-#' @param tok_fun a function which takes a character vector from preprocessor, split it into tokens and returns a list of character vectors.
+#' @param traindata a data frame or data table for training, two columns containing comment ID and comment text must be included.
+#' @param testdata a data frame or data table for test, two columns containing comment ID and comment text must be included.
+#' @param trainid column's name for comment ID of training data (default is "id"), quotation marks needed.
+#' @param testid column's name for comment ID of test data (default is "id"), quotation marks needed.
+#' @param traintext column's name for comment text of training data (default is "comment_text"), quotation marks needed.
+#' @param testtext column's name for comment text of test data (default is "comment_text"), quotation marks needed.
+#' @param prep_fun a function which takes chunk of character vectors and does all pre-processing (default is \strong{tolower}).
+#' @param tok_fun a function which takes a character vector from preprocessor, split it into tokens and returns a list of character vectors (default is \strong{tok_fun} in \strong{\emph{UmbrellaAcademy}} package).
+#' @param term_count.min minimum number of occurences for a term over all comments (default is 10).
 #'
 #' @return a list with the following elements:
-#' \itemize{
-#' \item{the document-term matrix for training data}
-#' \item{the document-term matrix for test data}
+#' \describe{
+#' \item{train.dtm}{the document-term matrix for training data}
+#' \item{test.dtm}{the document-term matrix for test data}
 #' }
 #'
 #' @examples
@@ -52,7 +57,14 @@ word_tokenizer(x) %>% lapply( function(x) SnowballC::wordStem(x,language="en"))
 #' @import stopwords
 #'
 #' @export
-preprocess <- function(traindata, testdata, prep_fun = tolower, tok_fun = tok_fun){
+preprocess <- function(traindata, testdata, trainid = "id", testid = "id", 
+                       traintext = "comment_text", testtext = "comment_text",
+                       prep_fun = tolower, tok_fun = UmbrellaAcademy::tok_fun, term_count.min = 10){
+  colnames(traindata)[which(colnames(traindata) == trainid)] = "id"
+  colnames(testdata)[which(colnames(testdata) == testid)] = "id"
+  colnames(traindata)[which(colnames(traindata) == traintext)] = "comment_text"
+  colnames(testdata)[which(colnames(testdata) == testtext)] = "comment_text"
+  
   it_train = itoken(traindata$comment_text,
                     preprocessor = prep_fun,
                     tokenizer = tok_fun,
@@ -62,7 +74,7 @@ preprocess <- function(traindata, testdata, prep_fun = tolower, tok_fun = tok_fu
 
   vocab = create_vocabulary(it_train, ngram=c(1L,3L), stopwords=stopwords("en",source="smart"))
 
-  prune.vocab <- prune_vocabulary(vocab, term_count_min = 10)
+  prune.vocab <- prune_vocabulary(vocab, term_count_min = term_count.min)
 
   vectorizer = vocab_vectorizer(prune.vocab)
   raw.dtm = create_dtm(it_train, vectorizer)
@@ -75,6 +87,5 @@ preprocess <- function(traindata, testdata, prep_fun = tolower, tok_fun = tok_fu
 
   raw.test.dtm = create_dtm(it_test, vectorizer)
 
-  return(list(train.dtm = raw.dtm,
-              test.dtm  = raw.test.dtm))
+  return(list(train.dtm = raw.dtm, test.dtm  = raw.test.dtm)) 
 }

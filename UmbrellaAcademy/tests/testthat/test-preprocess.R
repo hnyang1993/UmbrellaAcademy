@@ -7,7 +7,10 @@ testdata = test.data[1:100, ]
 
 test_that("errors for bad input", {
   expect_error(preprocess(traindata))
-  expect_error(preprocess(traindata, testdata, prep_fun = mean))
-  colnames(testdata) = c("id", "comment")
-  expect_error(preprocess(traindata, testdata))
+  expect_error(preprocess(traindata, testdata, prep_fun = 1))
+})
+
+test_that("two elements of the output have equal number of columns", {
+  pre = preprocess(traindata, testdata)
+  expect_equal(ncol(pre$train.dtm), ncol(pre$test.dtm))
 })

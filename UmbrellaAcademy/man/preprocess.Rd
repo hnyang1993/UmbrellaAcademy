@@ -4,22 +4,35 @@
 \alias{preprocess}
 \title{Data preprocessing}
 \usage{
-preprocess(traindata, testdata, prep_fun = tolower, tok_fun = tok_fun)
+preprocess(traindata, testdata, trainid = "id", testid = "id",
+  traintext = "comment_text", testtext = "comment_text",
+  prep_fun = tolower, tok_fun = UmbrellaAcademy::tok_fun,
+  term_count.min = 10)
 }
 \arguments{
-\item{traindata}{a matrix, list or data frame for training, with one of its columns named "comment_text".}
+\item{traindata}{a data frame or data table for training, two columns containing comment ID and comment text must be included.}
 
-\item{testdata}{a matrix, list or data frame for test, with one of its columns named "comment_text".}
+\item{testdata}{a data frame or data table for test, two columns containing comment ID and comment text must be included.}
 
-\item{prep_fun}{a function which takes chunk of character vectors and does all pre-processing.}
+\item{trainid}{column's name for comment ID of training data (default is "id"), quotation marks needed.}
 
-\item{tok_fun}{a function which takes a character vector from preprocessor, split it into tokens and returns a list of character vectors.}
+\item{testid}{column's name for comment ID of test data (default is "id"), quotation marks needed.}
+
+\item{traintext}{column's name for comment text of training data (default is "comment_text"), quotation marks needed.}
+
+\item{testtext}{column's name for comment text of test data (default is "comment_text"), quotation marks needed.}
+
+\item{prep_fun}{a function which takes chunk of character vectors and does all pre-processing (default is \strong{tolower}).}
+
+\item{tok_fun}{a function which takes a character vector from preprocessor, split it into tokens and returns a list of character vectors (default is \strong{tok_fun} in \strong{\emph{UmbrellaAcademy}} package).}
+
+\item{term_count.min}{minimum number of occurences for a term over all comments (default is 10).}
 }
 \value{
 a list with the following elements:
-\itemize{
-\item{the document-term matrix for training data}
-\item{the document-term matrix for test data}
+\describe{
+\item{train.dtm}{the document-term matrix for training data}
+\item{test.dtm}{the document-term matrix for test data}
 }
 }
 \description{
