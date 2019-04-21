@@ -5,8 +5,8 @@
 \title{Compute feature matrix for toxic/
 for toxic and non-toxic comments classification problem}
 \usage{
-comment_matrix(commentData, key.word.list, colname = "comment_text",
-  progress = TRUE)
+comment_matrix(commentData, key.word.list, id = "id",
+  colname = "comment_text", progress = TRUE)
 }
 \arguments{
 \item{commentData}{A dataframe of input comment data}
