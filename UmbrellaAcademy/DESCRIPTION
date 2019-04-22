@@ -1,0 +1,17 @@
+Package: UmbrellaAcademy
+Title: Toxic Comment Classification
+Version: 0.0.1
+Authors@R: c(
+    person("Yutong", "Liu", email = "yutongl@live.unc.edu", role = "aut"),
+    person("Yu", "Gu", email = "yugu@live.unc.edu", role = c("aut", "cre")),
+    person("Beilin", "Jia", email = "bjia7@live.unc.edu", role = "aut"),
+    person("Hannan", "Yang", email = "hnyang@live.unc.edu", role = "aut"),
+    person("Mochuan", "Liu", email = "mochuan_liu@med.unc.edu", role = "aut"))
+Description: This package contains important preprocessing functions for text data.
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.1.1
+Imports: text2vec, magrittr, SnowballC, stopwords, data.table, Matrix, stringr, svMisc
+Suggests: 
+    testthat

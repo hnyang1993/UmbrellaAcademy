@@ -7,7 +7,7 @@
 ##
 
 ## Input a comment data set with comment column named as comment_text
-Marginal_Freq <- function(commentData, label, f = NULL, id = 'id', colname = 'comment_text', min_count = 10){
+Marginal_Freq <- function(commentData, label, f = NULL, id = 'id', colname = 'comment_text', min_count = 10, threshold = 0.02){
   
   ## Change column name to default 'id'
   col.id <- which(names(commentData)== id)
@@ -87,7 +87,7 @@ Marginal_Freq <- function(commentData, label, f = NULL, id = 'id', colname = 'co
   term.count$termPerDiff <- f(term.count$termPercent.nontoxic, term.count$termPercent.toxic)
   
   ## r > 0.02
-  raw.list <- term.count$term[pmax(term.count$termCount.nontoxic, term.count$termCount.toxic)>5&term.count$termPerDiff>0.02]
+  raw.list <- term.count$term[pmax(term.count$termCount.nontoxic, term.count$termCount.toxic)>min_count&term.count$termPerDiff>threshold]
   
   ## Split itoken items into single words
   clean.list <- c()
