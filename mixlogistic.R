@@ -92,7 +92,14 @@ return(list(Iteration = iter,
             PredAccuracy = marginalpredAcc))
 }
 
-r <- apply(train_mar, 2, mixlogistic, gamma=gamma, tol=10^-5, maxit=50, prop_toxic=0.5, label=label)
+train_mar_new <- train_mar[,-which(colSums(train_mar) == 0)]
+l <- NULL
+for(i in 1:ncol(train_mar_new)){
+  l[i] <- length(table(train_mar_new[,i]))
+}
+
+r <- apply(train_mar_new[,1:30], 2, mixlogistic, gamma=gamma, tol=10^-5, maxit=50, prop_toxic=0.5, label=label)
+accuracy <- unlist(lapply(r, '[[', 4))
 ##data has problem, train_mar[,13] is all zero##
 
 ##Model: given class label (toxicity), model probability of occurrence of word (adjusted by comment length)
