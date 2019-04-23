@@ -11,11 +11,11 @@ train_mar_y <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/svm/trai
 
 train_mar_y <- train_mar_y$toxic
 
-library(caret)
-svmGrid <- expand.grid(C=0.1, sigma = sqrt(277))
+train_mar_full <- cbind(train_mar_y, train_mar)
 
-trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
-fit <- train(train_mar, as.factor(train_mar_y), method="svmRadial", trControl=trCtl, tuneGrid = svmGrid)
+library(e1071)
+
+fit <- tune.svm(as.factor(train_mar_y)~., data = train_mar_full, gamma = 2^(-8:8), cost = 0.1)
 
 result1 <- fit
 
