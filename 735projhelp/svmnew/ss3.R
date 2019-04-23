@@ -12,7 +12,7 @@ train_mar_y <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/svm/trai
 train_mar_y <- train_mar_y$toxic
 
 train_mar_full <- cbind(train_mar_y, train_mar)
-
+train_mar_full <- as.data.frame(train_mar_full)
 library(e1071)
 
 fit <- tune.svm(as.factor(train_mar_y)~., data = train_mar_full, gamma = 2^(-8:8), cost = 1)
