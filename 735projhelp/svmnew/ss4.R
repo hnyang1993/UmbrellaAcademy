@@ -13,6 +13,7 @@ train_mar_y <- train_mar_y$toxic
 
 train_mar_full <- cbind(train_mar_y, train_mar)
 train_mar_full <- as.data.frame(train_mar_full)
+train_mar_full[,-which(sapply(train_mar_full, function(v) var(v, na.rm=TRUE)==0))]
 library(e1071)
 
 fit <- tune.svm(as.factor(train_mar_y)~., data = train_mar_full, gamma = 2^(-8:8), cost = 5)
