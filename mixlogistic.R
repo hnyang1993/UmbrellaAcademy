@@ -40,7 +40,7 @@ colnames(pp) = c("non-toxic","toxic")
 
 ## use informative initialization, 
 ## should vary this and re-evaluate
-prop_toxic = 0.5
+prop_toxic = prop_toxic
 
 ## set everything greater than th
 pp[y > quantile(y, prop_toxic),2] = 1
