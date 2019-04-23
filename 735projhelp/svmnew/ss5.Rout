@@ -1,0 +1,49 @@
+
+R version 3.5.2 (2018-12-20) -- "Eggshell Igloo"
+Copyright (C) 2018 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> setwd("/nas/longleaf/home/yutongl/BIOS735/735projhelp/svmsep")
+> set.seed(111)
+> library(Matrix)
+> library(data.table)
+> train_mar <- readMM("/nas/longleaf/home/yutongl/BIOS735/735projhelp/svm/train_mar.txt")
+> train_mar <- as.matrix(train_mar)
+> keyword <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/svm/key_word_list.csv", stringsAsFactors = FALSE)
+> colnames(train_mar) <- keyword[,2]
+> train_mar_id <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/svm/train_mar_id.csv", stringsAsFactors=FALSE)
+> train_mar_y <- read.csv("/nas/longleaf/home/yutongl/BIOS735/735projhelp/svm/train_mar_label.csv", stringsAsFactors=FALSE)
+> 
+> train_mar_y <- train_mar_y$toxic
+> 
+> library(caret)
+Loading required package: lattice
+Loading required package: ggplot2
+> svmGrid <- expand.grid(C=50, sigma = sqrt(277))
+> 
+> trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
+> fit <- train(train_mar, as.factor(train_mar_y), method="svmRadial", trControl=trCtl, tuneGrid = svmGrid)
+There were 11 warnings (use warnings() to see them)
+> 
+> result5 <- fit
+> 
+> ## save output to .RData file
+> save(result5, file = "/nas/longleaf/home/yutongl/BIOS735/735projhelp/svmsep/s5.RData")
+> 
+> proc.time()
+    user   system  elapsed 
+6182.508  172.279 6356.847 
