@@ -1,0 +1,87 @@
+
+R version 3.5.2 (2018-12-20) -- "Eggshell Igloo"
+Copyright (C) 2018 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(text2vec)
+> library(data.table)
+> library(magrittr)
+> library(stopwords)
+> library(SnowballC)
+> library(caret)
+Loading required package: lattice
+Loading required package: ggplot2
+> library(glmnet)
+Loading required package: Matrix
+Loading required package: foreach
+Loaded glmnet 2.0-16
+
+> library(kernlab)
+
+Attaching package: ‘kernlab’
+
+The following object is masked from ‘package:ggplot2’:
+
+    alpha
+
+> 
+> setwd("/nas/longleaf/home/yutongl/BIOS735/slinear")
+> 
+> load("prelasso.RData")
+> 
+> ## svmLinear--based on terms selected from lasso
+> set.seed(111)
+> trCtl = trainControl(method = "cv")
+> tg <- data.frame(C=0.1)
+> fit_svmLinear_04 = train(x = dense.train.dtm, 
++                          y = as.factor(train.sample$toxic), 
++                          method = "svmLinear",
++                          tuneGrid = tg,
++                          trControl = trCtl)
+> pred_svmLinear_04 = predict(fit_svmLinear_04, as.matrix(test.dtm))
+> confusionMatrix(pred_svmLinear_04, as.factor(test.labels$toxic), positive = "1")
+Confusion Matrix and Statistics
+
+          Reference
+Prediction     0     1
+         0 36734   910
+         1 21154  5180
+                                          
+               Accuracy : 0.6551          
+                 95% CI : (0.6514, 0.6588)
+    No Information Rate : 0.9048          
+    P-Value [Acc > NIR] : 1               
+                                          
+                  Kappa : 0.1951          
+                                          
+ Mcnemar's Test P-Value : <2e-16          
+                                          
+            Sensitivity : 0.85057         
+            Specificity : 0.63457         
+         Pos Pred Value : 0.19670         
+         Neg Pred Value : 0.97583         
+             Prevalence : 0.09519         
+         Detection Rate : 0.08097         
+   Detection Prevalence : 0.41161         
+      Balanced Accuracy : 0.74257         
+                                          
+       'Positive' Class : 1               
+                                          
+> 
+> save(fit_svmLinear_04, file = "./sl04.RData")
+> sink(file = "svmlinear.txt")
+> 
