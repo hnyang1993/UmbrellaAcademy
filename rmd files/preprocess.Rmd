@@ -34,7 +34,7 @@ dim(test_labels)
 test_labels[1:10,]
 ```
    
-Here, for the testing dataset, a lable of -1 means that this comment was not be used in the evaluation, so we delete those records from the data set.
+Here, for the testing dataset, a lable of -1 means that this comment will not be used in the evaluation, so we delete those records from the data set.
 ```{r}
 # exclude text_label = -1
 test_labels_use <- test_labels[test_labels$toxic!=-1,]
