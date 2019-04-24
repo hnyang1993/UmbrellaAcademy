@@ -63,6 +63,6 @@ test.dtm  <- data.pre$test.dtm
   
 Let's then take a look at the the document-term matrices:
 ```{r}
-test.dtm[1:5,1:5]
 train.dtm[1:10, 13775:13780]
+test.dtm[1:10,1:4]
 ```
