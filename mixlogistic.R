@@ -1,3 +1,4 @@
+library(caret)
 library(Matrix)
 library(data.table)
 train_mar <- readMM("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/jigsaw-toxic-comment-classification-challenge/train_mar.txt")
@@ -85,11 +86,14 @@ while(eps > tol & iter < maxit){
 
 marginalpred <- ifelse(pp[,2] > 0.5, 1, 0) #1 represent toxic and 0 represent non-toxic
 marginalpredAcc <- length(which(marginalpred == label))/length(label)
-
+marginalpredSens <- confusionMatrix(as.factor(marginalpred), as.factor(label))$byClass[1]
+marginalpredSpec <- confusionMatrix(as.factor(marginalpred), as.factor(label))$byClass[2]
 return(list(Iteration = iter,
             logLikelihood = ll,
             epsilon = eps,
-            PredAccuracy = marginalpredAcc))
+            PredAccuracy = marginalpredAcc,
+            PredSensitivity = marginalpredSens,
+            PredSpecificity = marginalpredSpec))
 }
 
 train_mar_new <- train_mar[,-which(colSums(train_mar) == 0)]
@@ -100,6 +104,8 @@ for(i in 1:ncol(train_mar_new)){
 
 r <- apply(train_mar_new[,1:30], 2, mixlogistic, gamma=gamma, tol=10^-5, maxit=50, prop_toxic=0.5, label=label)
 accuracy <- unlist(lapply(r, '[[', 4))
+sens <- unlist(lapply(r, '[[', 5))
+spec <- unlist(lapply(r, '[[', 6))
 ##data has problem, train_mar[,13] is all zero##
 
 ##Model: given class label (toxicity), model probability of occurrence of word (adjusted by comment length)
