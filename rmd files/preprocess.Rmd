@@ -16,22 +16,22 @@ We start by loading our package "UmbrellaAcademy",
 ```{r}
 library(UmbrellaAcademy)
 ```
-Next, we start by reading in the original files with function `fread` from package `data.table`.  
+Next, we start by reading in the original files.  
 
 ```{r}
-setwd("~/Desktop/BIOS 735/final_project/UmbrellaAcademy/UmbrellaAcademy/data-raw")
-train.data   <- fread("train.csv")
-test         <- fread("test.csv")
-test_labels  <- fread("test_labels.csv")
+data("train.data")
+data("test.data")
+data("test_labels")
 ```
+
   
 We will then take a look at the dimension and structure of the raw dataset.  
   
 ```{r}
 dim(train.data)
 train.data[1:10,]
-dim(test)
-test[1:10,]
+dim(test.data)
+test.data[1:10,]
 dim(test_labels)
 test_labels[1:10,]
 ```
@@ -40,7 +40,7 @@ Here, for the testing dataset, a lable of -1 means that this comment will not be
 ```{r}
 # exclude text_label = -1
 test_labels_use <- test_labels[test_labels$toxic!=-1,]
-test_use <- test[test_labels$toxic!=-1,]
+test_use        <- test.data[test_labels$toxic!=-1,]
 ```
 
 Then, for the training set, we down sample the nontoxic comments and obtain a balanced training set.  
