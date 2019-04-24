@@ -1,0 +1,68 @@
+---
+title: "Preprocess result"
+author: "Yutong Liu"
+date: "4/24/2019"
+output: html_document
+---
+```{r}
+library(devtools)
+load_all("/Users/liuyutong/Desktop/BIOS 735/final_project/UmbrellaAcademy/UmbrellaAcademy")
+```
+
+** Pre-process **
+We start by loading our package "UmbrellaAcademy",
+```{r}
+library(UmbrellaAcademy)
+```
+Next, we start by reading in the original files with function `fread` from package `data.table`.  
+
+```{r}
+setwd("~/Desktop/BIOS 735/final_project/UmbrellaAcademy/UmbrellaAcademy/data-raw")
+train.data   <- fread("train.csv")
+test         <- fread("test.csv")
+test_labels  <- fread("test_labels.csv")
+```
+  
+We will then take a look at the dimension and structure of the raw dataset.  
+  
+```{r}
+dim(train.data)
+train.data[1:10,]
+dim(test)
+test[1:10,]
+dim(test_labels)
+test_labels[1:10,]
+```
+   
+Here, for the testing dataset, a lable of -1 means that this comment was not be used in the evaluation, so we delete those records from the data set.
+```{r}
+# exclude text_label = -1
+test_labels_use <- test_labels[test_labels$toxic!=-1,]
+test_use <- test[test_labels$toxic!=-1,]
+```
+
+Then, for the training set, we down sample the nontoxic comments and obtain a balanced training set.  
+
+```{r}
+# undersample nontoxic group
+toxic.id    = which(train.data$toxic==1) # # of toxic = 15294
+nontoxic.id = which(train.data$toxic==0) # # of nontoxic = 144277
+set.seed(123)
+nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
+train.sample      = train.data[c(toxic.id,nontoxic.sampleId),]
+```
+   
+We then process the training set and test set by using the function `preprocess` from our package, which will gives us the document-term matrices as the output. This function will help performing tokenization, stemming, removing stop words, removing features that appear less than 10 times across all comments and applying count vectorization.
+
+```{r}
+data.pre <- preprocess(traindata = train.sample, testdata = test_use, 
+                                prep_fun = tolower, tok_fun = tok_fun)
+train.dtm <- data.pre$train.dtm
+test.dtm  <- data.pre$test.dtm
+```
+  
+Let's then take a look at the the document-term matrices:
+```{r}
+test.dtm[1:5,1:5]
+train.dtm[1:10, 13775:13780]
+```
