@@ -8,8 +8,10 @@ output: html_document
 library(devtools)
 load_all("/Users/liuyutong/Desktop/BIOS 735/final_project/UmbrellaAcademy/UmbrellaAcademy")
 ```
-
-** Pre-process **
+  
+  
+** Pre-process **  
+  
 We start by loading our package "UmbrellaAcademy",
 ```{r}
 library(UmbrellaAcademy)

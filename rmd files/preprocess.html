@@ -199,7 +199,8 @@ load_all(&quot;/Users/liuyutong/Desktop/BIOS 735/final_project/UmbrellaAcademy/U
 <pre><code>## The following objects are masked from 'package:devtools':
 ## 
 ##     setup, test_file</code></pre>
-<p>** Pre-process ** We start by loading our package “UmbrellaAcademy”,</p>
+<p>** Pre-process **</p>
+<p>We start by loading our package “UmbrellaAcademy”,</p>
 <pre class="r"><code>library(UmbrellaAcademy)</code></pre>
 <p>Next, we start by reading in the original files with function <code>fread</code> from package <code>data.table</code>.</p>
 <pre class="r"><code>setwd(&quot;~/Desktop/BIOS 735/final_project/UmbrellaAcademy/UmbrellaAcademy/data-raw&quot;)
@@ -293,7 +294,7 @@ test_labels  &lt;- fread(&quot;test_labels.csv&quot;)</code></pre>
 ##  8:             0
 ##  9:            -1
 ## 10:            -1</code></pre>
-<p>Here, for the testing dataset, a lable of -1 means that this comment was not be used in the evaluation, so we delete those records from the data set.</p>
+<p>Here, for the testing dataset, a lable of -1 means that this comment will not be used in the evaluation, so we delete those records from the data set.</p>
 <pre class="r"><code># exclude text_label = -1
 test_labels_use &lt;- test_labels[test_labels$toxic!=-1,]
 test_use &lt;- test[test_labels$toxic!=-1,]</code></pre>
@@ -372,20 +373,6 @@ train.sample      = train.data[c(toxic.id,nontoxic.sampleId),]</code></pre>
 <pre class="r"><code>train.dtm &lt;- data.pre$train.dtm
 test.dtm  &lt;- data.pre$test.dtm</code></pre>
 <p>Let’s then take a look at the the document-term matrices:</p>
-<pre class="r"><code>test.dtm[1:5,1:5]</code></pre>
-<pre><code>## 5 x 5 sparse Matrix of class &quot;dgCMatrix&quot;
-##                  whi_specif_wikipedia gentl vacat creat_test_pleas
-## 0001ea8717f6de06                    .     .     .                .
-## 000247e83dcc1211                    .     .     .                .
-## 0002f87b16116a7f                    .     .     .                .
-## 0003e1cccfd5a40a                    .     .     .                .
-## 00059ace3e3e9a53                    .     .     .                .
-##                  august_2007_utc
-## 0001ea8717f6de06               .
-## 000247e83dcc1211               .
-## 0002f87b16116a7f               .
-## 0003e1cccfd5a40a               .
-## 00059ace3e3e9a53               .</code></pre>
 <pre class="r"><code>train.dtm[1:10, 13775:13780]</code></pre>
 <pre><code>## 10 x 6 sparse Matrix of class &quot;dgCMatrix&quot;
 ##                  talk edit wikipedia page articl fuck
@@ -399,6 +386,19 @@ test.dtm  &lt;- data.pre$test.dtm</code></pre>
 ## 0020e7119b96eeeb    .    .         .    .      .    .
 ## 0020fd96ed3b8c8b    .    .         .    .      .    .
 ## 0021fe88bc4da3e6    2    .         1    4      .    4</code></pre>
+<pre class="r"><code>test.dtm[1:10,1:4]</code></pre>
+<pre><code>## 10 x 4 sparse Matrix of class &quot;dgCMatrix&quot;
+##                  whi_specif_wikipedia gentl vacat creat_test_pleas
+## 0001ea8717f6de06                    .     .     .                .
+## 000247e83dcc1211                    .     .     .                .
+## 0002f87b16116a7f                    .     .     .                .
+## 0003e1cccfd5a40a                    .     .     .                .
+## 00059ace3e3e9a53                    .     .     .                .
+## 000663aff0fffc80                    .     .     .                .
+## 000689dd34e20979                    .     .     .                .
+## 000844b52dee5f3f                    .     .     .                .
+## 00091c35fa9d0465                    .     .     .                .
+## 000968ce11f5ee34                    .     .     .                .</code></pre>
 
 
 
