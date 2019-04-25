@@ -1,0 +1,113 @@
+---
+title: "Finite Mixture Logistic Regression"
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+header_includes:
+- \usepackage{amsmath}
+- \usepackage{amssymb}
+- \usepackage{amsthm}
+include-before:
+- '\newcommand{\bfm}[1]{\ensuremath{\mathbf{#1}}}'
+- '\newcommand{\bdm}[1]{\ensuremath{\boldsymbol{#1}}}'
+- '$\def \d \bfm{d}$'
+- '$\def \e \bfm{e}$'
+- '$\def \g \bfm{g}$'
+- '$\def \I \bfm{I}$'
+- '$\def \l \bfm{l}$'
+- '$\def \M \bfm{M}$'
+- '$\def \W \bfm{W}$'
+- '$\def \y \bfm{y}$'
+- '$\def \Y \bfm{Y}$'
+- '$\def \x \bfm{x}$'
+- '$\def \X \bfm{X}$'
+- '$\def \z \bfm{z}$'
+- '$\def \thetab \boldsymbol{\theta}$'
+- '$\def \betab \boldsymbol{\beta}$'
+- '$\def \pib \boldsymbol{\pi}$'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data and Model
+Define $y_i = I(a \; word \; in \; the \; vocabulary \; appears \; in \; the \; i_{th} \; comment)$, $\gamma_i = length \; of \; the \; i_{th} \; comment$, $z_i = I(the \; i_{th} \; comment \; is \; toxic)$. Then given the comment data (after tokenization and basic preprocessing) only, $y_i$ and $\gamma_i$ are observed for each subject $i$ while $z_i$'s are unobserved. For each group $k=0,1$ (1 indicating that the comment is toxic), model the occurrence of a word within a comment from one of the groups by a logistic regression model with offset $$logit({p_k}(y_i = 1|\gamma_i)) = \theta_k + \gamma_i,$$ let $\pi_k$ be the prior probability that the comment should fall into group $k$ (proportion of group $k$).
+
+## (Observed Data) Log Likelihood
+$$l(\boldsymbol{\theta}) = \sum_{i=1}^n \log\left( \sum_{k =0}^1 \pi_kp_k(y_i|\gamma_{i}, {\theta}_k)\right),$$ where $p_k(y_i|\gamma_{i}, {\theta}_k) =  {p_k}(y_i = 1|\gamma_i)^{y_i} {p_k}(y_i = 0|\gamma_i)^{1-y_i}$,  $logit({p_k}(y_i = 1|\gamma_i)) = \theta_k + \gamma_i$  and  $\sum_{k = 0}^1 \pi_k = 1$.
+
+## Complete Data Log Likelihood
+\begin{align}
+l_c(\boldsymbol{\theta}) &= \sum_{i=1}^n \log( \prod_{k =0}^1 \left[\pi_kp_k(y_i|\gamma_i, {\theta}_k)\right]^{I[z_i = k]}) \\
+&= \sum_{i=1}^n \sum_{k =0}^1 I[z_i = k]\left[\log(\pi_k)+\log(p_k(y_i|\gamma_i, {\theta}_k))\right]\\
+\end{align}
+
+# EM Algorithm
+## E-step
+Need to evaluate $Q(\boldsymbol{\theta}|\boldsymbol{\theta}^{(t)}) = E\left[ \log l_c(\boldsymbol{\theta}) | \boldsymbol{y}_o,\boldsymbol{\theta}^{(t)}\right]$, which can be simplified as the following:
+
+\begin{align}
+Q(\boldsymbol{\theta}|\boldsymbol{\theta}^{(t)}) &=\sum_{i=1}^n \sum_{k =0}^1 E[I[z_i = k] | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)}]\left[\log(\pi_k)+\log(p_k(y_i|\gamma_i, {\theta}_k))\right]\\
+&= \sum_{i=1}^n \sum_{k =0}^1 p(z_i = k | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)})\left[\log(\pi_k)+\log(p_k(y_i|\gamma_i, {\theta}_k))\right]
+\end{align}
+
+where
+
+\begin{align}
+p(z_i = k | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)})
+&= \frac{\pi_k^{(t)}p_k(y_i|\gamma_i, {\theta}^{(t)}_k)}{ \sum_{k =0}^1\pi_k^{(t)}p_k(y_i|\gamma_i, {\theta}^{(t)}_k)}
+\end{align}
+
+## M-step
+The Q function can be separated as weighted log likelihoods with prior weights being the posterior probabilities of group membership given the current updated value of parameters. The $\theta$'s can be updated by weighted logistic regression with offset while the $\pi$'s can be updated simply by taking the average of posterior probabilities for being in each group.
+
+## Implememtation
+```{r eval=FALSE}
+data("train_mar")
+data("train_mar_id")
+data("train.data")
+data("dense.train.dtm")
+data("keyword_mf")
+
+train_mar <- cbind(train_mar_id[,2], train_mar)
+train_mar <- train_mar[order(train_mar[,1]),]
+train_mar <- train_mar[,-1]
+train_mar <- apply(train_mar,2,as.numeric)
+train_mar[which(train_mar > 0)] <- 1 ##30588 by 277 matrix
+
+train_sub <- train.data[which(unlist(train.data$id) %in% train_mar_id[,2]),]
+train_sub <- train_sub[order(train_sub$id),]
+
+label <- train_sub$toxic
+l <- sapply(train_sub$comment_text, strsplit, " ")
+gamma <- unlist(lapply(l,length)) ##30588 length vector
+gamma <- unname(gamma)
+#gamma <- rep(0,nrow(train_mar))
+
+y <- train_mar[,2]
+n <- nrow(train_mar)
+
+train_mar_new <- train_mar[,-which(colSums(train_mar) == 0)]
+kw_mf <- kw[-which(colSums(train_mar) == 0),2]
+colnames(train_mar_new) <- kw_mf
+
+res_mf <- apply(train_mar_new[,1:30], 2, mixlogistic, gamma=gamma, tol=10^-5, maxit=50, prop_toxic=0.5, label=label)
+accuracy_mf <- unlist(lapply(res_mf, '[[', 4))
+sens_mf <- unlist(lapply(res_mf, '[[', 5))
+spec_mf <- unlist(lapply(res_mf, '[[', 6))
+summary(accuracy_mf)
+summary(sens_mf)
+
+
+dense.train.dtm[which(dense.train.dtm > 0)] <- 1
+res_lasso <- apply(dense.train.dtm[,1:30], 2, mixlogistic, gamma=gamma, label=label, Trace = F)
+accuracy_lasso <- unlist(lapply(res_lasso, '[[', 4))
+sens_lasso <- unlist(lapply(res_lasso, '[[', 5))
+spec_lasso <- unlist(lapply(res_lasso, '[[', 6))
+summary(accuracy_lasso)
+summary(sens_lasso)
+```
+Based on the summary of the prediction acurracy using the occurrence of one word (first 30 words from either lasso selected dataset or marginal frequency selected dataset), the overall prediction accuracies are around 50% (not too useful since it is hard to classify toxicity based on occurrence of one word), furthermore the specificities are mostly over 90%, indicating that the occurrence of each of these words in a comment is associated with toxicity of the comment, hence our selected words from lasso or marginal frequency still makes sense and the procedure of dimension reduction still included most of the useful keywords relevant to toxicity.
