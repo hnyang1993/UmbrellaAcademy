@@ -26,8 +26,8 @@ comment_matrix <- function(commentData, key.word.list, id = 'id', colname = 'com
   
   ## Testing functions
   if(!is.data.frame(commentData))  stop("Input data is not a dataframe")
-  if(is.null(commentData[, id])) stop("Id is missing")
-  if(is.null(commentData[, colname])) stop("Comment text is missing")
+  if(is.null(commentData[, ..id])) stop("Id is missing")
+  if(is.null(commentData[, ..colname])) stop("Comment text is missing")
   
   ## Package
   #require('Matrix')

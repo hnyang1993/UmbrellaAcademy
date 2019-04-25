@@ -31,13 +31,13 @@
 #' @import SnowballC
 #'
 #' @export
-Marginal_Freq <- function(commentData, label, f = NULL, id = 'id', colname = 'comment_text', min_count = 10, threshold = 0.02){
+Marginal_Freq <- function(commentData, label, f = NULL, id = 'id', colname = "comment_text", min_count = 10, threshold = 0.02){
 
   ## Testing functions
   if(!is.data.frame(commentData)) stop("Input data is not a dataframe")
   if(dim(commentData)[1]!=length(label)) stop("Length of label is invalid")
-  if(is.null(commentData[, id])) stop("Id is missing")
-  if(is.null(commentData[, colname])) stop("Comment text is missing")
+  if(is.null(commentData[, ..id])) stop("Id is missing")
+  if(is.null(commentData[, ..colname])) stop("Comment text is missing")
   
   ## Change column name to default 'id'
   col.id <- which(names(commentData)== id)
