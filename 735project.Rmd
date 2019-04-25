@@ -1,9 +1,14 @@
 ---
 title: "Toxic Comment Classification"
 author: 'Umbrella Academy: Yutong Liu, Yu Gu, Beilin Jia, Hannan Yang, Mochuan Liu'
-date: "4/18/2019"
+date: "4/24/2019"
 output: html_document
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 Link to Project Groups and Instructions
 https://docs.google.com/document/d/1JCwMYaIVjGyIKKOJKyBTlva63OEBd_4aCASiZWBSHbM/edit?usp=sharing
 
@@ -54,124 +59,367 @@ The previous datasets were obtained after selecting the keywords correlated to t
 
 
 # 4. Results
-```{r,eval=FALSE}
-library(text2vec)
-library(Matrix)
-library(data.table)
-library(magrittr)
-library(stopwords)
-library(SnowballC)
+We start by loading all the existing R packages we need as well as our own package "UmbrellaAcademy".
+```{r warning=FALSE}
+library(devtools)
 library(caret)
 library(glmnet)
-library(tree)
-library(randomForest)
-library(UmbrellaAcademy)
-### read data
-setwd("/pine/scr/b/j/bjia7/735project/")
-test         <- fread("test.csv")
-test_labels  <- fread("test_labels.csv")
-train.data   <- fread("train.csv")
+library(ggrepel)
+library(scales)
+library(e1071)
+library(ggplot2)
+load_all("UmbrellaAcademy")
+```
 
+Next, we load all the data in our package.
+```{r}
+data("train.data")
+data("test.data")
+data("test_labels")
+```
+
+###Important preprocessing
+Before preprocessing, we first take a look at the dimension and structure of the raw dataset.  
+  
+```{r}
+dim(train.data)
+head(train.data)
+dim(test.data)
+head(test.data)
+dim(test_labels)
+head(test_labels)
+```
+
+Here, for the test dataset, a lable of -1 means that this comment will not be used in the evaluation, so we delete those records from the dataset.
+```{r}
+# exclude text_label = -1
+test_labels_use <- test_labels[test_labels$toxic != -1, ]
+test_use <- test.data[test_labels$toxic != -1, ]
+```
+
+Then, for the training set, we down sample the nontoxic comments and obtain a balanced training set.  
+
+```{r}
 # undersample nontoxic group
-toxic.id    = which(train.data$toxic==1) # # of toxic = 15294
-nontoxic.id = which(train.data$toxic==0) # # of nontoxic = 144277
+toxic.id    = which(train.data$toxic == 1) # # of toxic = 15294
+nontoxic.id = which(train.data$toxic == 0) # # of nontoxic = 144277
 set.seed(123)
 nontoxic.sampleId = sample(nontoxic.id,length(toxic.id))
-train.sample      = train.data[c(toxic.id,nontoxic.sampleId),]
+train.sample      = train.data[c(toxic.id, nontoxic.sampleId), ]
+```
 
-# exclude text_label = -1
-test_labels_use <- test_labels[test_labels$toxic!=-1,]
-test_use <- test[test_labels$toxic!=-1,]
+We then process the training set and test set by using the function `preprocess` from our package, which will give us the document-term matrices as the output. This function will help performing tokenization, stemming, removing stop words, removing features that appear less than 10 times across all comments and applying count vectorization.
 
-### preprocess data
-data.pre <- preprocess(traindata = train.sample, testdata = test_use, 
-                                prep_fun = tolower, tok_fun = tok_fun)
+```{r}
+data.pre <- preprocess(traindata = train.sample, testdata = test_use)
 train.dtm <- data.pre$train.dtm
-test.dtm  <- data.pre$test.dtm
+raw.test.dtm  <- data.pre$raw.test.dtm
+it_test <- data.pre$it_test
+raw.vocab <- data.pre$raw.vocab
+```
+
+Let's then take a look at the dimension and structure of the document-term matrices:
+```{r}
+dim(train.dtm)
+train.dtm[1:10, 13775:13780]
+dim(raw.test.dtm)
+raw.test.dtm[1:10, 13775:13780]
+```
 
 ### LASSO
+We first use LASSO to reduce dimensions of document-term matrix (DTM). 
+
+```{r, eval = FALSE}
 set.seed(111)
-feature.selection = cv.glmnet(train.dtm, train.sample$toxic, family = "binomial",type.measure = "auc")
+feature.selection <- cv.glmnet(train.dtm, train.sample$toxic, family = "binomial")
+```
 
-beta = coef(feature.selection,lambda = feature.selection$lambda.1se)
-s.train <- train.dtm[,which(beta!=0)]
-dense.train.dtm <- as.matrix(s.train)
+```{r}
+load("RData/feature_selection.Rdata")
+# fit LASSO by using lambda.1se
+fit <- glmnet(train.dtm, train.sample$toxic, family = "binomial",
+             alpha=1,lambda=feature.selection$lambda.1se)
+# LASSO prediction
+pred_LASSO <- predict(fit, raw.test.dtm, type = "class")
+# prediction accuracy
+sum(pred_LASSO == as.vector(test_labels_use$toxic))/length(pred_LASSO)# 0.5484229
+```
 
-### LASSO --> random forest
+We also try to use LASSO to fit and directly predict on test dataset. But the accuracy is only $54.8\%$, which may not be good enough. So we will explore other machine learning techniques to improve the prediction results. 
+
+Finally, we create the new dense DTM for our test data based on the 122 keywords selected from LASSO.
+
+```{r}
+# prepare dense matrix to train random forest and SVM
+s.vocab <- raw.vocab[which(fit$beta!=0),]
+s.vectorizer <- vocab_vectorizer(s.vocab)
+dense.train.dtm <- as.matrix(train.dtm[, which(fit$beta!=0)])
+test.dtm <- create_dtm(it_test, s.vectorizer)
+```
+
+#### LASSO --> Random Forest
+LASSO helps to reduce the number of columns of DTM to $122$, and then we use the `train` function in `caret` to handle the running of models over a grid of parameters. We train both random forest and SVM models and use 10-fold cross validation resampling method for tuning.
+
+Let's first see how we train random forest models. 
+```{r, eval=FALSE}
 control <- trainControl(method="cv", number=10, search="grid")
 metric <- "Accuracy"
 set.seed(1)
 p <- dim(dense.train.dtm)[2]
 tunegrid <- expand.grid(.mtry=c(2^(0:6),p))
+# train rf
 rf_gridsearch <- train(dense.train.dtm, train.sample$toxic, 
                        method="rf", metric=metric, tuneGrid=tunegrid, 
                        trControl=control)
+```
 
-### LASSO --> SVM
-## SVM Radial
+```{r}
+# demonstrate cross validation results, create a plot of Kappa against mtry
+load("RData/rf_gridsearch2.Rdata")
+rf <- rf_gridsearch$results
+tune.best <- rf[order(rf$Kappa, decreasing = T)[1],]
+ggplot(rf, aes(mtry, Kappa)) + geom_point() + geom_line() + 
+  geom_point(data = tune.best, col="black", size=3.5, stroke = 0.8, shape=21) + 
+  scale_x_continuous(breaks = c(1,2,4,8,16,32,64)) +
+  geom_label_repel(data = tune.best, label = "mtry = 16", color = 'white', 
+                   fill = hue_pal()(5)[5], segment.color="grey", nudge_x = 6, nudge_y = -0.05, size = 4) + ggtitle("Cross Validation Results of Random Forest based on LASSO")
+```
+From this plot, we can see that Kappa increases fast when mtry changes from 1 to 8 and decreases slightly after reaching its maximum at mtry = 16. So we will use mtry = 16 to predict on test dataset. 
+
+```{r}
+pred_lassoRF <- predict(rf_gridsearch, as.matrix(test.dtm))
+# prediction accuracy
+sum(pred_lassoRF==test_labels_use$toxic)/length(pred_lassoRF)
+# confusion matrix
+pred_lassoRF <- ifelse(pred_lassoRF==0,"pred_non_toxic","pred_toxic")
+test_toxic <- ifelse(test_labels_use$toxic==0,"expect_non_toxic","expect_toxic")
+table_lassoRF <- table(pred_lassoRF,test_toxic)
+print(table_lassoRF)
+# marginal percentage
+prop_table_lassoRF <- prop.table(table_lassoRF,2)
+print(prop_table_lassoRF)
+```
+The diagnoal of above confusion matrix represent specificity ($=64.2\%$) and sensitivity ($=84.1\%$). The overall prediction accuracy of random forest is around $66.1\%$. 
+
+#### LASSO --> Linear SVM
+Next, we train SVM models with linear kernel and radial basis function kernel. Let's start with linear SVM. 
+```{r, eval = FALSE}
 set.seed(111)
 trCtl = trainControl(method = "cv")
-tg <- expand.grid(C = seq(10,90,20)), sigma = c(0.5,1,1.5,2,3,4,5,7,9))
-fit_svmRadial = train(x = dense.train.dtm, 
-                      y = as.factor(train.sample$toxic), 
-                      method = "svmRadial", 
-                      tuneGrid = tg,
-                      trControl = trCtl)
-pred_svmRadial = predict(fit_svmRadial, as.matrix(test.dtm))
-cm_rsvm = confusionMatrix(pred_svmRadial, as.factor(test.labels$toxic), positive = "1")
-
-
-## SVM Linear
-set.seed(111)
-trCtl = trainControl(method = "cv")
-tg <- data.frame(C=c(1,seq(10,100,10)))
+tg <- data.frame(C=c(0.1,0.5,1,10))
 fit_svmLinear = train(x = dense.train.dtm, 
                       y = as.factor(train.sample$toxic), 
                       method = "svmLinear",
                       tuneGrid = tg,
                       trControl = trCtl)
-pred_svmLinear = predict(fit_svmLinear, as.matrix(test.dtm))
-cm_lsvm = confusionMatrix(pred_svmLinear, as.factor(test.labels$toxic), positive = "1")
+```
 
-### Marginal Frequency 
-train_mar <- readMM("/nas/longleaf/home/hnyang/735proj/rf/train_mar.txt")
-train_mar <- as.matrix(train_mar)
-keyword <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/key_word_list.csv", stringsAsFactors = FALSE)
-colnames(train_mar) <- keyword[,2]
-train_mar_id <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/train_mar_id.csv", stringsAsFactors=FALSE)
-train_mar_y <- read.csv("/nas/longleaf/home/hnyang/735proj/rf/train_mar_label.csv", stringsAsFactors=FALSE)
+```{r}
+# demonstrate cross validation results, create a plot of Kappa against cost
+load("RData/lsvm.Rdata")
+load("RData/lsvm_results.Rdata")
+tune.best <- lsvm_results[order(lsvm_results$Kappa, decreasing = T)[1],]
+ggplot(lsvm_results, aes(C, Kappa)) + geom_point() + geom_line() + 
+  geom_point(data = tune.best, col="black", size=3.5, stroke = 0.8, shape=21) + 
+  scale_x_continuous(breaks = c(0.1,0.5,1,10)) +
+  geom_label_repel(data = tune.best, label = "Cost = 0.1", color = 'white', 
+                   fill = hue_pal()(5)[5], segment.color="grey", nudge_x = 0.5, size = 4) + 
+  ggtitle("Cross Validation Results of Linear SVM based on LASSO")
+```
+Based on cross validation results, we obtain the best Kappa when cost equals to 0.1. Also, Kappa has a large drop when cost becomes 0.5. We then use linear SVM with cost = 0.1 to predict toxicity/nontoxicity. 
 
-train_mar_y <- train_mar_y$toxic
+```{r}
+pred_lassoSVMlinear = predict(fit_svmLinear, as.matrix(test.dtm))
+# prediction accuracy
+sum(pred_lassoSVMlinear==test_labels_use$toxic)/length(pred_lassoSVMlinear)
+# confusion matrix
+pred_lassoSVMlinear <- ifelse(pred_lassoSVMlinear==0,"pred_non_toxic","pred_toxic")
+table_lassoSVMlinear <- table(pred_lassoSVMlinear, test_toxic)
+print(table_lassoSVMlinear)
+# marginal percentage
+prop_table_lassoSVMlinear <- prop.table(table_lassoSVMlinear,2)
+print(prop_table_lassoSVMlinear)
+```
+For linear SVM, the sensitivity is $85.1\%$ and the specificity equals to $63.5\%$. The overall accuracy is around $65.5\%$. 
 
-### marginal frequency --> random forest
-rfGrid <- expand.grid(mtry=c(2, 4, 8, 12, 16, 20, 24, 28, 32, 36))
+#### LASSO --> Radial SVM
+Then, we consider the SVM model with radial basis function (RBF) kernel. 
+```{r, eval = FALSE}
+set.seed(111)
+trCtl = trainControl(method = "cv") 
+tg <- expand.grid(C = seq(10,100,10), sigma = c(0.5,1,1.5,2,3,4,5,7,9))
+fit_svmRadial = train(x = dense.train.dtm, 
+                      y = as.factor(train.sample$toxic), 
+                      method = "svmRadial", 
+                      tuneGrid = tg,
+                      trControl = trCtl)
+```
 
-trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
-fit <- train(train_mar, as.factor(train_mar_y), method="rf", trControl=trCtl, tuneGrid = rfGrid)
+```{r}
+load("RData/rsvm.Rdata")
+load("RData/rsvm_results.Rdata")
+tune.best = rsvm_results[order(rsvm_results$Kappa, decreasing = T)[1],]
+# Kappa plot
+ggplot(rsvm_results, aes(sigma, Kappa, col = factor(C))) + geom_point() + geom_line() + 
+  geom_point(data = tune.best, col="black", size=3.5, stroke = 0.8, shape=21) + 
+  labs(color = "Cost") + scale_x_continuous(breaks = c(0.5,1,1.5,2,3,4,5,7,9)) +
+  geom_label_repel(data = tune.best, label = "Cost = 90, sigma = 0.5", color = 'white', 
+                   fill = hue_pal()(5)[5], segment.color="black", nudge_x = 2, size = 4) + 
+  ggtitle("Cross Validation Results of Radial SVM based on LASSO")
+```
+Each line on above plot represents a value of cost function we used to tune RBF SVM model. We can see that lines have similar trends as sigma becomes large, which implies that cost function does not have much influence on Kappa. However, Kappa is clearly sensitive to the choices of sigma. The combination of cost = 90 and sigma = 0.5 yields the best value of Kappa. We will then use this combination to obtain prediction results. 
 
-### margianl frequency --> SVM linear
-svmGrid <- expand.grid(C=seq(10,100,by=10))
+```{r}
+pred_lassoSVMRadial = predict(fit_svmRadial, as.matrix(test.dtm))
+# prediction accuracy
+sum(pred_lassoSVMRadial==test_labels_use$toxic)/length(pred_lassoSVMRadial)
+# confusion matrix
+pred_lassoSVMRadial <- ifelse(pred_lassoSVMRadial==0,"pred_non_toxic","pred_toxic")
+table_lassoSVMRadial <- table(pred_lassoSVMRadial,test_toxic)
+print(table_lassoSVMRadial)
+# marginal percentage
+prop_table_lassoSVMRadial <- prop.table(table_lassoSVMRadial,2)
+print(prop_table_lassoSVMRadial)
+```
+The sensitivity and specificity are $72.1\%$ and $67.0\%$, respectively. The overall prediction accuracy equals to $67.5\%$. 
 
-trCtl <- trainControl(method="cv", number=10, savePredictions=FALSE)
-fit <- train(train_mar, as.factor(train_mar_y), method="svmLinear", trControl=trCtl, tuneGrid = svmGrid)
+Comparing the prediction results obtained from three models based on LASSO, RBF SVM has the highest overall accuracy of $67.5\%$ as well as the best specificity of $67.0\%$, and linear SVM has the best sensitivity of $85.1\%$.
+
+### Marginal Frequency
+In the previous section, we implemented several machine learning techniques and compared the prediction performance using the reduced DTM obtained from LASSO regression as our training data. In this section, we will redo the similar comparison and dicuss the performance of different ML tools where now we will use reduced DTM determined by marginal frequency difference creteria we proposed early as our training data set. Later we will see that features selected by marginal frequncy creteria can guarantee a better classification performance than LASSO approach, with a higher overall accuracy of 80%. 
+
+```{r}
+## Marginal Frequency Variable Selection
+## 
+## Variable selection and feature matrix generating based on marginal frequency difference 
+## takes a long time to run. So instead of rerunning the whole variable selection procedures, 
+## here we only display our R code and load the saved date for the classifier training
+## 
+
+# MF <- Marginal_Freq(train.sample, train.sample$toxic, threshold = 0.02)
+# key.word.list <- MF$keyword
+# train_mar <- comment_matrix(train.sample, key.word.list)
+# test_mar <- comment_matrix(test_use, key.word.list)
+
+train_mar <- readMM("RData/train_mar.txt")
+test_mar <- readMM("RData/test_mar.txt")
+```
+
+Choose frequency difference threshold to be 0.02, after variable selection the reduced MF-DTM will now have 277 columns corresponding to 277 selected keywords. Using this dataset as input training data, we train 3 classifiers using LASSO, RBF SVM and random forest and compare the performance between 3 different approaches as well as the performance of classifiers using LASSO-DTM as training data.
+
+#### MF --> LASSO
+
+We first look at the performance of using simple LASSO regression (glmnet) as a classifier. In order to reach the best performance, we select the penalty parameter $\lambda$ through a 5-folds cross-validation. 
+```{r}
+## LASSO CV
+cv.model <- cv.glmnet(x = train_mar, y = train.sample$toxic, family = "binomial")
+print("Optimal lambda")
+print(cv.model$lambda.min)
+
+## Train LASSO classifier using the optimal tuning parameter (lambda = 1.87e-5)
+model.lasso <- glmnet(x = train_mar, y = train.sample$toxic, family = "binomial", alpha = 1, lambda = cv.model$lambda.min)
+
+label.predict <- predict(model.lasso, test_mar, type = "class")
+# prediction accuracy
+sum(label.predict==test_labels_use$toxic)/length(label.predict)
+# confusion matrix
+pred_MFLasso <- ifelse(label.predict==0,"pred_non_toxic","pred_toxic")
+table_MFLasso <- table(pred_MFLasso, test_toxic)
+print(table_MFLasso)
+# marginal percentage
+prop_table_MFLasso <- prop.table(table_MFLasso, 2)
+print(prop_table_MFLasso)
+```
+
+The optimal penalty parameter $\lambda_{opt}=1.87e-5$ implies that, in the optimal model, most of the features will have non-zero coefficients and will contribute to the classification. The non-sparsity of the lasso classifier also indicates that our feature selection is successful as no features should not be dropped off.
+
+The sensitivity and specificity of LASSO classifier on the testing data are equal to 74.8% and 85.7% respectively, with an overall accuracy of 84.6%. Up to now, the LASSO classifier using MF-DTM as input training data has the highest overall accuracy; however, as we emphasized early, the testing data is not balanced where only 10% of the testing comments are toxic comment and we also prefer a classifier with a higher sensitivity as our project aim is to identify the toxic comment as much as possible. Hence the LASSO classifier is still undesirable as its sensitivity is much lower than the specifity. 
+
+#### MF --> RBF SVM
+
+```{r}
+##
+## Tuning plot for RBF SVM
+##
+
+load("RData/mf.rsvm.Rdata")
+tune.best.svm = svm[order(svm$error, decreasing = F)[1],]
+
+ggplot(svm, aes(cost, error)) + geom_point() + geom_line() + 
+  geom_point(data = tune.best.svm, col="black", size=3.5, stroke = 0.8, shape=21) + 
+  scale_x_continuous(breaks = c(.1,.5,1,5,10,15,20,25,30)) + 
+  geom_label_repel(data = tune.best.svm, label = "cost=10", color = 'white', 
+                   fill = hue_pal()(5)[5], segment.color="black", nudge_y = 0.005, size = 4)
+
+
+
+## Train RBF SVM classifier using the optimal tuning parameter (C=10, sigma2 = 2^8)
+#model.svm <- svm(x = train_mar, y = factor(train.sample$toxic), cost = 10, gamma = 2^(-8))
+model.svm  <- readRDS("data-mf-tuning/mf_svm.rds")
+label.predict <- predict(model.svm, test_mar)
+
+pred_MFSVM <- ifelse(label.predict==0,"pred_non_toxic","pred_toxic")
+table_MFSVM <- table(pred_MFSVM, test_labels_use$toxic)
+print(table_MFSVM)
+```
+
+The low sensitivity of LASSO classifier may also imply that the true dicision boundary might not be linear. So now we move forward and look at the performance of the classifier obtained through RBF SVM (using svm function from package e1071). Set $\sigma^2$ equal to $2^8$, by looking at the tuning plot we can see that the optimal cost $C=10$. When $C=10$ and $\sigma^2=2^8$, the classifier will have an overall accuracy of 77.4% with sensitivity equal to 87.9% and specifity equal to 76.3%. The RBF SVM classifier has a much higher senesitivity than all other classifiers we obtained before, however, its specifity is much lower than the senesitivity and classifier are more likely to identify non toxic comments as toxic comments. Hence, it seems that the good performance of RBF SVM classifier for toxic comment is very likely due to overfitting.
+
+
+
+#### MF --> Random Forest
+```{r}
+##
+## Tuning plot for random forest
+##
+
+library(randomForest)
+library(ggplot2)
+set.seed(123)
+
+load("data-mf-tuning/rfCV1.RData")
+rf_marfreq = result$results
+tune.best = rf_marfreq[order(rf_marfreq$Kappa, decreasing = T)[1],]
+library(ggrepel)
+library(scales)
+# Kappa plot
+ggplot(rf_marfreq, aes(mtry, Kappa)) + geom_point() + geom_line() + 
+  geom_point(data = tune.best, col="black", size=3.5, stroke = 0.8, shape=21) + 
+  scale_x_continuous(breaks = c(2,4,8,12,16,20,24,28,32,36)) +
+  geom_label_repel(data = tune.best, label = "mtry = 12", color = 'white', 
+                   fill = hue_pal()(5)[5], segment.color="black", nudge_y = -0.01, size = 4)
+
+
+## Train random forest classifier using the optimal tuning parameter (mtree = 12)
+
+## model.rf <- randomForest(x = as.matrix(train_mar), y = factor(train.sample$toxic), mtry = 12)
+model.rf <- readRDS("data-mf-tuning/mf_rf.rds")
+label.predict <- predict(model.rf, test_mar)
+
+pred_MFRF <- ifelse(label.predict==0,"pred_non_toxic","pred_toxic")
+table_MFRF <- table(pred_MFRF, test_labels_use$toxic)
+print(table_MFRF)
 
 ```
+At last, we will try to look at the performance of the classifier obtained from random forest (use randomForest function from package randomForest). Set ntree to be default value 500, again, by looking at the tuning plot we can see that the optimal value for tuning parameter ntree is reached at mtry=12. The random forest classifier has an overall 80% accuracy, with the sensitivity equal to 84.4% and the specifity equal to 79.6%. Even though the overall accuracy of random forest classifier is lower than LASSO classifier and the sensitivity is lower than RBF SVM classifier, the random forest classifier is the only classifier with both a relatively high sensitivity and specifity, which makes it more favorable to the LASSO classifier and SVM classifier.  
 
 
 
 # 5. Discussion
 ###Strengths: 
-* Our method is easy to implement and the results are interpretable. It’s feasible to apply our method to other datasets of toxic comments and to classify other types of comments such as favorable/negative review.   
-
+* Our method is easy to implement and the results are interpretable. It’s feasible to apply our method to other datasets of toxic comments and to classify other types of comments such as favorable/negative review. 
+   
+* The prediction results (especially based on marginal frequency) are satisfactory. We also train an **xgboost** model using LSA and TF-IDF to preprocess raw data (we borrowed codes from kaggle), which gives the overall accuracy of about 85%. It’s very close to the accuracy achieved from marginal frequency and lasso. 
 
 ###Limitation:
 * The selection of tuning parameters for both random forest and SVM is computationally intensive (mainly due to the use of package `caret` when training rf and svm).  
 
-* We subsample our training set to create a balanced dataset to build and train our models, which may cause the loss of information of the nontoxic group. What’s more, we predict the results based on a much larger test dataset (size of 63k records), comparing with the training set of 30k records. The difference in size of training and testing set may lead to inaccuracy in both toxic and nontoxic prediction.  
+* We subsample our training set to create a balanced dataset to build and train our models, which may cause the loss of information of the nontoxic group.
+
+* We predict the results based on a much larger and unbalanced test dataset (size of 63k records, ratio of toxic to nontoxic comments = 1:9), comparing with the training set of 30k records. The difference in size of datasets and ratio of toxic and nontoxic comments may lead to inaccuracy in both toxic and nontoxic prediction. 
 
 ###Moving forward:
 * Some comments cannot be classified correctly due to the way that we tokenize and vectorize comments. We can improve this by looking at specific patterns of comments. 
-Other machine learning techniques such as xgboost can be explored and applied for a better prediction results. 
 
 # 6. References
 [1] Word frequency data https://www.wordfrequency.info/free.asp?s=y
