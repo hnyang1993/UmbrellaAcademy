@@ -1,0 +1,117 @@
+---
+title: "Marginal Frequency Results"
+author: "MC"
+date: "4/25/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = FALSE)
+```
+
+### Marginal Frequency
+In the previous section, we implemented several machine learning techniques and compared the prediction performance using the reduced DTM obtained from LASSO regression as our training data. In this section, we will redo the similar comparison and dicuss the performance of different ML tools where now we will use reduced DTM determined by marginal frequency difference creteria we proposed early as our training data set. Later we will see that features selected by marginal frequncy creteria can gaurantee a better classification performance than LASSO approach, with a higher overall accuracy of 80%. 
+
+```{r}
+## Marginal Frequency Variable Selection
+## 
+## Variable selection and feature matrix generating based on marginal frequency difference 
+## takes a long time to run. So instead of rerunning the whole variable selection procedures, 
+## here we only display our R code and load the saved date for the classifier training
+## 
+
+# MF <- Marginal_Freq(train.sample, train.sample$toxic, threshold = 0.02)
+# key.word.list <- MF$keyword
+# train_mar <- comment_matrix(train.sample, key.word.list)
+# test_mar <- comment_matrix(test_use, key.word.list)
+
+## set working directory to package root
+## setwd("~/")
+train_mar <- readMM("data-mf-tuning/train_mar.txt")
+test_mar <- readMM("data-mf-tuning/test_mar.txt")
+```
+
+Choose frequency difference threshold to be 0.02, after variable selection the reduced MF-DTM will now have 277 columns corresponding to 277 selected keywords. Using this dataset as input training data, we train 3 classifiers using LASSO, RBF SVM and random forest and compare the performance between 3 different approaches as well as the performance of classifiers using LASSO-DTM as training data.
+
+#### MF --> LASSO
+
+We first look at the performance of using simple LASSO regression (glmnet) as a classifier. In order to reach the best performance, we select the penalty parameter $\lambda$ through a 5-folds cross-validation. 
+```{r}
+## LASSO CV
+cv.model <- cv.glmnet(x = train_mar, y = train.sample$toxic, family = "binomial")
+
+print("Optimal lambda")
+print(cv.model$lambda.min)
+
+## Train LASSO classifier using the optimal tuning parameter (lambda = 1.87e-5)
+model.lasso <- glmnet(x = train_mar, y = train.sample$toxic, family = "binomial", alpha = 1, lambda = cv.model$lambda.min)
+
+label.predict <- predict(model.lasso, test_mar)
+
+pred_MFLasso <- ifelse(label.predict==0,"pred_non_toxic","pred_toxic")
+table_MFLasso <- table(pred_MFLasso, test_labels_use)
+print(table_MFLasso)
+```
+
+The optimal penalty parameter $\lambda_{opt}=1.87e-5$ implies that, in the optimal model, most of the features will have non-zero coefficients and will contribute to the classification. The non-sparsity of the lasso classifier also indicates that our feature selection is successful as no features should not be dropped off.
+
+The sensitivity and specificity of LASSO classifier on the testing data are equal to 74.8% and 85.7% respectively, with an overall accuracy of 84.6%. Up to now, the LASSO classifier using MF-DTM as input training data has the highest overall accuracy; however, as we emphasized early, the testing data is not balanced where only 10% of the testing comments are toxic comment and we also prefer a classifier with a higher sensitivity as our project aim is to identify the toxic comment as much as possible. Hence the LASSO classifier is still undesirable as its sensitivity is much lower than the specifity. 
+
+#### MF --> RBF SVM
+
+```{r}
+##
+## Tuning plot for RBF SVM
+##
+
+## Train RBF SVM classifier using the optimal tuning parameter (C=10, sigma2 = 2^8)
+model.svm <- svm(x = comment.matrix, y = factor(IndexData$toxic), cost = 10, gamma = 2^(-8))
+
+label.predict <- predict(model.svm, test_mar)
+
+pred_MFSVM <- ifelse(label.predict==0,"pred_non_toxic","pred_toxic")
+table_MFSVM <- table(pred_MFSVM, test_labels_use)
+print(table_MFSVM)
+```
+
+The low sensitivity of LASSO classifier may also imply that the true dicision boundary might not be linear. So now we move forward and look at the performance of the classifier obtained through RBF SVM (using svm function from package e1071). Set cost equal to 10, by looking at the tuning plot we can see that the optimal $\sigma^2=\gamma^{-1}=2^8$. When $C=10$ and $\sigma^2=2^8$, the classifier will have an overall accuracy of 77.4% with sensitivity equal to 87.9% and specifity equal to 76.3%. The RBF SVM classifier has a much higher senesitivity than all other classifiers we obtained before, however, its specifity is much lower than the senesitivity and classifier are more likely to identify non toxic comments as toxic comments. Hence, it seems that the good performance of RBF SVM classifier for toxic comment is very likely due to overfitting.
+
+
+#### MF --> Random Forest
+```{r}
+##
+## Tuning plot for random forest
+##
+
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s1.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s2.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s3.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s4.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s5.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s6.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s7.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s8.RData")
+#load("/Users/tangxin/Desktop/Coursework/2019 Spring/BIOS 735/UmbrellaAcademy/735projhelp/svmnew2/s9.RData")
+svm <- rbind(result1$performances, result2$performances, result3$performances, result4$performances,
+             result5$performances, result6$performances, result7$performances, result8$performances,
+             result9$performances)
+tune.best.svm = svm[order(svm$error, decreasing = F)[1],]
+
+ggplot(svm, aes(cost, error)) + geom_point() + geom_line() + 
+  geom_point(data = tune.best.svm, col="black", size=3.5, stroke = 0.8, shape=21) + 
+  scale_x_continuous(breaks = c(.1,.5,1,5,10,15,20,25,30)) + 
+  geom_label_repel(data = tune.best.svm, label = "cost=10", color = 'white', 
+                   fill = hue_pal()(5)[5], segment.color="black", nudge_y = 0.005, size = 4)
+
+
+## Train random forest classifier using the optimal tuning parameter (mtree = 12)
+model.rf <- randomForest(x = as.matrix(comment.matrix), y = factor(IndexData$toxic), mtry = 12)
+
+label.predict <- predict(model.rf, test_mar)
+
+pred_MFRF <- ifelse(label.predict==0,"pred_non_toxic","pred_toxic")
+table_MFRF <- table(pred_MFRF, test_labels_use)
+print(table_MFRF)
+
+```
+At last, we will try to look at the performance of the classifier obtained from random forest (use randomForest function from package randomForest). Set ntree to be default value 500, again, by looking at the tuning plot we can see that the optimal value for tuning parameter ntree is reached at ntree=12. The random forest classifier has an overall 80% accuracy, with the sensitivity equal to 84.6% and the specifity equal to 79.6%. Even though the overall accuracy of random forest classifier is lower than LASSO classifier and the sensitivity is lower than RBF SVM classifier, the random forest classifier is the only classifier with both a relatively high sensitivity and specifity, which makes it more favorable to the LASSO classifier and SVM classifier.  
