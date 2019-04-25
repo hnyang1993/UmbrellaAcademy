@@ -2,10 +2,12 @@
 
 export(Marginal_Freq)
 export(comment_matrix)
+export(mixlogistic)
 export(preprocess)
 export(tok_fun)
 import(Matrix)
 import(SnowballC)
+import(caret)
 import(data.table)
 import(magrittr)
 import(stopwords)
