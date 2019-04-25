@@ -60,7 +60,7 @@ table_MFLasso <- table(pred_MFLasso, test_labels_use$toxic)
 print(table_MFLasso)
 ```
 
-The optimal penalty parameter $\lambda_{opt}=1.87e-5$ implies that, in the optimal model, most of the features will have non-zero coefficients and will contribute to the classification. The non-sparsity of the lasso classifier also indicates that our feature selection is successful as no features should not be dropped off.
+The optimal penalty parameter $\lambda_{opt}=2.06e^{-5}$ implies that, in the optimal model, most of the features will have non-zero coefficients and will contribute to the classification. The non-sparsity of the lasso classifier also indicates that our feature selection is successful as no features should not be dropped off.
 
 The sensitivity and specificity of LASSO classifier on the testing data are equal to 74.8% and 85.7% respectively, with an overall accuracy of 84.6%. Up to now, the LASSO classifier using MF-DTM as input training data has the highest overall accuracy; however, as we emphasized early, the testing data is not balanced where only 10% of the testing comments are toxic comment and we also prefer a classifier with a higher sensitivity as our project aim is to identify the toxic comment as much as possible. Hence the LASSO classifier is still undesirable as its sensitivity is much lower than the specifity. 
 
@@ -107,11 +107,8 @@ table_MFSVM <- table(pred_MFSVM, test_labels_use$toxic)
 print(table_MFSVM)
 ```
 
-<<<<<<< HEAD
 The low sensitivity of LASSO classifier may also imply that the true dicision boundary might not be linear. So now we move forward and look at the performance of the classifier obtained through RBF SVM (using svm function from package e1071). Set $\sigma^2$ equal to $2^8$, by looking at the tuning plot we can see that the optimal cost $C=10$. When $C=10$ and $\sigma^2=2^8$, the classifier will have an overall accuracy of 77.4% with sensitivity equal to 87.9% and specifity equal to 76.3%. The RBF SVM classifier has a much higher senesitivity than all other classifiers we obtained before, however, its specifity is much lower than the senesitivity and classifier are more likely to identify non toxic comments as toxic comments. Hence, it seems that the good performance of RBF SVM classifier for toxic comment is very likely due to overfitting.
-=======
-The low sensitivity of LASSO classifier may also imply that the true decision boundary might not be linear. So now we move forward and look at the performance of the classifier obtained through RBF SVM (using svm function from package e1071). Set cost equal to 10, by looking at the tuning plot we can see that the optimal $\sigma^2=\gamma^{-1}=2^8$. When $C=10$ and $\sigma^2=2^8$, the classifier will have an overall accuracy of 77.4% with sensitivity equal to 87.9% and specifity equal to 76.3%. The RBF SVM classifier has a much higher senesitivity than all other classifiers we obtained before, however, its specifity is much lower than the senesitivity and classifier are more likely to identify non toxic comments as toxic comments. Hence, it seems that the good performance of RBF SVM classifier for toxic comment is very likely due to overfitting.
->>>>>>> 1079a622770d3746f738989101a7157692b4681d
+
 
 
 #### MF --> Random Forest
@@ -148,4 +145,4 @@ table_MFRF <- table(pred_MFRF, test_labels_use$toxic)
 print(table_MFRF)
 
 ```
-At last, we will try to look at the performance of the classifier obtained from random forest (use randomForest function from package randomForest). Set ntree to be default value 500, again, by looking at the tuning plot we can see that the optimal value for tuning parameter ntree is reached at mtry=12. The random forest classifier has an overall 80% accuracy, with the sensitivity equal to 84.6% and the specifity equal to 79.6%. Even though the overall accuracy of random forest classifier is lower than LASSO classifier and the sensitivity is lower than RBF SVM classifier, the random forest classifier is the only classifier with both a relatively high sensitivity and specifity, which makes it more favorable to the LASSO classifier and SVM classifier.  
+At last, we will try to look at the performance of the classifier obtained from random forest (use randomForest function from package randomForest). Set ntree to be default value 500, again, by looking at the tuning plot we can see that the optimal value for tuning parameter ntree is reached at mtry=12. The random forest classifier has an overall 80% accuracy, with the sensitivity equal to 84.4% and the specifity equal to 79.6%. Even though the overall accuracy of random forest classifier is lower than LASSO classifier and the sensitivity is lower than RBF SVM classifier, the random forest classifier is the only classifier with both a relatively high sensitivity and specifity, which makes it more favorable to the LASSO classifier and SVM classifier.  
