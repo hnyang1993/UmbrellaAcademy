@@ -10,7 +10,7 @@ knitr::opts_chunk$set(eval = FALSE)
 ```
 
 ### Marginal Frequency
-In the previous section, we implemented several machine learning techniques and compared the prediction performance using the reduced DTM obtained from LASSO regression as our training data. In this section, we will redo the similar comparison and dicuss the performance of different ML tools where now we will use reduced DTM determined by marginal frequency difference creteria we proposed early as our training data set. Later we will see that features selected by marginal frequncy creteria can gaurantee a better classification performance than LASSO approach, with a higher overall accuracy of 80%. 
+In the previous section, we implemented several machine learning techniques and compared the prediction performance using the reduced DTM obtained from LASSO regression as our training data. In this section, we will redo the similar comparison and dicuss the performance of different ML tools where now we will use reduced DTM determined by marginal frequency difference creteria we proposed early as our training data set. Later we will see that features selected by marginal frequncy creteria can guarantee a better classification performance than LASSO approach, with a higher overall accuracy of 80%. 
 
 ```{r}
 ## Marginal Frequency Variable Selection
@@ -74,7 +74,7 @@ table_MFSVM <- table(pred_MFSVM, test_labels_use)
 print(table_MFSVM)
 ```
 
-The low sensitivity of LASSO classifier may also imply that the true dicision boundary might not be linear. So now we move forward and look at the performance of the classifier obtained through RBF SVM (using svm function from package e1071). Set cost equal to 10, by looking at the tuning plot we can see that the optimal $\sigma^2=\gamma^{-1}=2^8$. When $C=10$ and $\sigma^2=2^8$, the classifier will have an overall accuracy of 77.4% with sensitivity equal to 87.9% and specifity equal to 76.3%. The RBF SVM classifier has a much higher senesitivity than all other classifiers we obtained before, however, its specifity is much lower than the senesitivity and classifier are more likely to identify non toxic comments as toxic comments. Hence, it seems that the good performance of RBF SVM classifier for toxic comment is very likely due to overfitting.
+The low sensitivity of LASSO classifier may also imply that the true decision boundary might not be linear. So now we move forward and look at the performance of the classifier obtained through RBF SVM (using svm function from package e1071). Set cost equal to 10, by looking at the tuning plot we can see that the optimal $\sigma^2=\gamma^{-1}=2^8$. When $C=10$ and $\sigma^2=2^8$, the classifier will have an overall accuracy of 77.4% with sensitivity equal to 87.9% and specifity equal to 76.3%. The RBF SVM classifier has a much higher senesitivity than all other classifiers we obtained before, however, its specifity is much lower than the senesitivity and classifier are more likely to identify non toxic comments as toxic comments. Hence, it seems that the good performance of RBF SVM classifier for toxic comment is very likely due to overfitting.
 
 
 #### MF --> Random Forest
