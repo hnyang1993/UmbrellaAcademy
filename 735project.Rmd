@@ -54,7 +54,7 @@ where $f_1(w)$ and $f_0(w)$ denote the word/phrase frequency in toxic and non-to
 In practice, we do similar preprocessing by tokenizing the data first and compute the frequency difference based on the tokenized frequency table. In addition to the frequency difference lower bound, to exclude rare keywords we also require that the total count of the given word/phrase should be larger than 10. For simplicity and practical consideration, we break the selected phrases into word lists. After variable selection, the final training data has 277 columns of total counts of 277 unique keywords for each training comments. 
 
 ##Application of EM Algorithm: Finite Mixture Logistic Regression
-The previous datasets were obtained after selecting the keywords correlated to the label “toxic”: logistic regression with lasso eliminated variables by $L_1$ penalization while marginal frequency thresholding eliminated variables that have similar distributions within toxic samples and non-toxic samples. Here one might be interested in checking if each of the selected variables (keywords) indeed has predictive values for classifying toxicity. We proposed a mixture model with two classes and model the occurrence of a specific keyword in each of the classes by logistic regression with offset (adjusting for the length of the comment). By estimating the parameters in the mixture model, one may calculate the posterior probabilities of falling into specific class given the occurrence of a specific keyword.
+The previous datasets were obtained after selecting the keywords correlated to the label “toxic”: logistic regression with LASSO eliminated variables by $L_1$ penalization while marginal frequency thresholding eliminated variables that have similar distributions within toxic samples and non-toxic samples. Here one might be interested in checking if each of the selected variables (keywords) indeed has predictive values for classifying toxicity. We proposed a mixture model with two classes and model the occurrence of a specific keyword in each of the classes by logistic regression with offset (adjusting for the length of the comment). By estimating the parameters in the mixture model, one may calculate the posterior probabilities of falling into specific class given the occurrence of a specific keyword.
 
 
 
@@ -319,7 +319,7 @@ Choose frequency difference threshold to be 0.02, after variable selection the r
 
 ### Marginal Frequency --> LASSO
 
-We first look at the performance of using simple LASSO regression (glmnet) as a classifier. In order to reach the best performance, we select the penalty parameter $\lambda$ through a 5-folds cross-validation. 
+We first look at the performance of using simple LASSO regression (glmnet) as a classifier. In order to reach the best performance, we select the penalty parameter $\lambda$ through a 10-folds cross-validation, the lambda sequence was chosen by default and `lambda.min` was considered to be the optimal $\lambda$ for prediction. 
 ```{r}
 ## LASSO CV
 cv.model <- cv.glmnet(x = train_mar, y = train.sample$toxic, family = "binomial")
@@ -346,7 +346,7 @@ The optimal penalty parameter $\lambda_{opt}=1.87e-5$ implies that, in the optim
 The sensitivity and specificity of LASSO classifier on the testing data are equal to 74.8% and 85.7% respectively, with an overall accuracy of 84.6%. Up to now, the LASSO classifier using MF-DTM as input training data has the highest overall accuracy; however, as we emphasized early, the testing data is not balanced where only 10% of the testing comments are toxic comment and we also prefer a classifier with a higher sensitivity as our project aim is to identify the toxic comment as much as possible. Hence the LASSO classifier is still undesirable as its sensitivity is much lower than the specifity. 
 
 ### Marginal Frequency --> RBF SVM
-
+To train SVM with radial basis function kernel, we apply the function `tune.svm` in the R package `e1071` and performed a grid search over possible values for tuning parameter `cost`. $\gamma = 1/{\sigma}^2$ was chosen to be close to the default value ($1/p$, with $p$ being the dimension of training covariate matrix) in function `svm`. To evaluate the performances of RBF SVM given different tuning parameters, 10-fold cross-validations were performed.
 ```{r}
 keyword <- read.csv("RData/data-mf-tuning/key_word_list.csv", stringsAsFactors = FALSE)
 colnames(train_mar) <- keyword[,2]
@@ -376,6 +376,7 @@ ggplot(svm, aes(cost, error)) + geom_point() + geom_line() +
   ggtitle("Cross Validation Results of RBF SVM based on Marginal Frequency")
 ```
 
+Given the results from cross-validations, we chose the value for `cost` that could minimize the cross-validation error. The optimal tuning parameters obtained from cross-validations were `cost`= 10 and $\gamma$ = 2^-8, we then trained the RBF SVM with these tuning parameter values and made prediction. 
 
 ```{r}
 ## Train RBF SVM classifier using the optimal tuning parameter (C=10, sigma2 = 2^8)
@@ -398,6 +399,8 @@ The low sensitivity of LASSO classifier may also imply that the true dicision bo
 
 
 ### Marginal Frequency --> Random Forest
+To train Random Forest, we apply the function `train` in the R package `caret` and performed a grid search over possible values for tuning parameter `mtry`. To evaluate the performances of Random Forest given different tuning parameters, 10-fold cross-validations were performed.
+
 ```{r, eval=FALSE}
 rfGrid <- expand.grid(mtry=c(2, 4, 8, 12, 16, 20, 24, 28, 32, 36))
 
@@ -417,10 +420,11 @@ ggplot(rf_marfreq, aes(mtry, Kappa)) + geom_point() + geom_line() +
   geom_label_repel(data = tune.best, label = "mtry = 12", color = 'white', 
                    fill = hue_pal()(5)[5], segment.color="black", nudge_y = -0.01, size = 4) +
   ggtitle("Cross Validation Results of Random Forest based on Marginal Frequency")
+```
 
+Given the results from cross-validations, we chose the value for `mtry` that could maximize the Kappa or accuracy. The optimal tuning parameters obtained from cross-validations was `mtry`= 12 , we then trained the Random Forest with this tuning parameter value and made prediction. 
 
-## Train random forest classifier using the optimal tuning parameter (mtree = 12)
-
+```{r}
 ## model.rf <- randomForest(x = as.matrix(train_mar), y = factor(train.sample$toxic), mtry = 12)
 model.rf <- readRDS("RData/data-mf-tuning/mf_rf.rds")
 label.predict <- predict(model.rf, test_mar)
@@ -470,6 +474,10 @@ p(z_i = k | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)})
 The Q function can be separated as weighted log likelihoods with prior weights being the posterior probabilities of group membership given the current updated value of parameters. The $\theta$'s can be updated by weighted logistic regression with offset while the $\pi$'s can be updated simply by taking the average of posterior probabilities for being in each group.
 
 #### Implememtation
+We summarized the above algorithm for fitting finite mixture logistic regression model into a function `mixlogistic` in our package `UmbrellaAcademy`. Our function can take in a data vector of keyword occurrence, a data vector of comment length, and another data vector of toxicity label and make prediction based on keyword occurrence for each subject using the posterior probabilities $p(z_i = 1 | \boldsymbol{y}_o, \boldsymbol{\theta}^{(t)})$ (posterior probability of belonging to toxic class given keyword occurrence and comment length). The prediction results were summarized as overall accuracy, sensitivity and specificity.
+
+For illustration, we selected the first 30 keywords from each of the two datasets after dimension reduction (LASSO or marginal frequency selection). Then we applied function `mixlogistic` and obtained prediction results. 
+
 ```{r eval=FALSE, warning=FALSE}
 data("train_mar")
 data("train_mar_id")
@@ -515,6 +523,9 @@ spec_lasso <- unlist(lapply(res_lasso, '[[', 6))
 summary(accuracy_lasso)
 summary(sens_lasso)
 ```
+
+Based on the summary of the prediction acurracy using the occurrence of one word (first 30 words from either LASSO selected dataset or marginal frequency selected dataset), the overall prediction accuracies are around 50% (not too useful since it is hard to classify toxicity based on occurrence of one word), furthermore the specificities are mostly over 90%, indicating that the occurrence of each of these words in a comment is associated with toxicity of the comment, hence our selected words from lasso or marginal frequency still makes sense and the procedure of dimension reduction still included most of the useful keywords relevant to toxicity.
+
 
 #Discussion
 ##Strengths: 
