@@ -108,7 +108,7 @@ Based on cross validation results, we obtain the best Kappa when cost equals to 
 ```{r}
 pred_lassoSVMlinear = predict(fit_svmLinear, as.matrix(test.dtm))
 pred_lassoSVMlinear <- ifelse(pred_lassoSVMlinear==0,"pred_non_toxic","pred_toxic")
-table_lassoSVMlinear <- table(pred_svmLinear,test_toxic)
+table_lassoSVMlinear <- table(pred_lassoSVMlinear,test_toxic)
 print(table_lassoSVMlinear)
 ```
 ```{r}
