@@ -32,7 +32,9 @@ preprocess(traindata, testdata, trainid = "id", testid = "id",
 a list with the following elements:
 \describe{
 \item{train.dtm}{the document-term matrix for training data}
-\item{test.dtm}{the document-term matrix for test data}
+\item{raw.test.dtm}{the raw document-term matrix for test data}
+\item{it_test}{itoken iterator for test data}
+\item{raw.vocab}{vocabulary object for training data}
 }
 }
 \description{

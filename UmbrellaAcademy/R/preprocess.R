@@ -37,7 +37,9 @@ word_tokenizer(x) %>% lapply( function(x) SnowballC::wordStem(x,language="en"))
 #' @return a list with the following elements:
 #' \describe{
 #' \item{train.dtm}{the document-term matrix for training data}
-#' \item{test.dtm}{the document-term matrix for test data}
+#' \item{raw.test.dtm}{the raw document-term matrix for test data}
+#' \item{it_test}{itoken iterator for test data}
+#' \item{raw.vocab}{vocabulary object for training data}
 #' }
 #'
 #' @examples
@@ -69,7 +71,7 @@ preprocess <- function(traindata, testdata, trainid = "id", testid = "id",
                     preprocessor = prep_fun,
                     tokenizer = tok_fun,
                     ids = traindata$id,
-                    progressbar = TRUE)
+                    progressbar = FALSE)
 
 
   vocab = create_vocabulary(it_train, ngram=c(1L,3L), stopwords=stopwords("en",source="smart"))
@@ -77,15 +79,15 @@ preprocess <- function(traindata, testdata, trainid = "id", testid = "id",
   prune.vocab <- prune_vocabulary(vocab, term_count_min = term_count.min)
 
   vectorizer = vocab_vectorizer(prune.vocab)
-  raw.dtm = create_dtm(it_train, vectorizer)
+  raw.train.dtm = create_dtm(it_train, vectorizer)
 
   it_test = itoken(testdata$comment_text,
                    preprocessor = prep_fun,
                    tokenizer = tok_fun,
                    ids = testdata$id,
-                   progressbar = TRUE)
+                   progressbar = FALSE)
 
   raw.test.dtm = create_dtm(it_test, vectorizer)
 
-  return(list(train.dtm = raw.dtm, test.dtm  = raw.test.dtm)) 
+  return(list(train.dtm = raw.train.dtm, raw.test.dtm  = raw.test.dtm, it_test = it_test, raw.vocab = prune.vocab)) 
 }
